@@ -12,3 +12,7 @@
 | Forms | react-hook-form + zod | Type-safe validation, minimal re-renders |
 | Backend | Supabase | Generate TS types from schema |
 | i18n | i18next + react-i18next + expo-localization | See Stage 2 for RTL |
+
+
+## Notes
+- SDK 54 template (as of Aug 2026) ships without the old demo files (explore/hello-wave/parallax/etc.) — Stage 0.2 cleanup step skipped, nothing to remove.
