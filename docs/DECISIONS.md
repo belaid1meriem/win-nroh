@@ -16,3 +16,4 @@
 
 ## Notes
 - SDK 54 template (as of Aug 2026) ships without the old demo files (explore/hello-wave/parallax/etc.) — Stage 0.2 cleanup step skipped, nothing to remove.
+- Windows + metro-config: `metro-config/src/loadConfig.js` uses a raw `import(absolutePath)` on Windows absolute paths, which Node's ESM loader rejects (`ERR_UNSUPPORTED_ESM_URL_SCHEME`). Patched via patch-package to wrap with `pathToFileURL()`. See patches/metro-config+0.83.3.patch. Do not remove.
