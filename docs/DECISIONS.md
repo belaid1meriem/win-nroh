@@ -22,3 +22,8 @@
 ## Stage 2 notes
 - RTL flip + language switch: visual verification requires an EAS standalone build (Expo Go can't simulate native restart). Deferred to Stage 10.
 - Language persisted via AsyncStorage (`@app_language`), app render gated behind async i18n init + expo-splash-screen to avoid FOUC-style language flash.
+
+## Stage 3 notes
+- Used `Stack.Protected` (Expo Router SDK 53+) instead of the roadmap's manual `if (!session) return <Redirect />` pattern — current official doc recommendation, declarative guard with automatic history cleanup. See https://docs.expo.dev/router/advanced/authentication/
+- `SessionProvider` is a placeholder (local state only) until real auth is wired in Stage 6.
+- Deep link testing (`npx uri-scheme open winnroh://...`) requires an iOS simulator or Android emulator — deferred, not available in current dev environment.

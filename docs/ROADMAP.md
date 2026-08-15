@@ -52,3 +52,20 @@
 ## Notes Stage 2
 
 37. Vérification visuelle du flip RTL et du switch de langue **différée au Stage 10 (EAS Build)** — Expo Go ne peut pas simuler un redémarrage natif complet.
+
+
+## Stage 3 — Navigation
+
+38. Lire la doc Expo Router "Authentication" (approche actuelle, pas le pattern manuel du roadmap original) — https://docs.expo.dev/router/advanced/authentication/
+39. Lire la doc "Protected routes" pour comprendre le comportement de `Stack.Protected` — https://docs.expo.dev/router/advanced/protected/
+40. **Écart assumé vs roadmap** : utiliser `Stack.Protected` (guard déclaratif, SDK 53+) au lieu du pattern manuel `if (!session) return <Redirect />` — recommandation actuelle de la doc officielle.
+41. Créer un `SessionProvider` placeholder (state local) en attendant le vrai système d'auth du Stage 6.
+42. Déclarer les groupes de routes protégés avec des guards strictement complémentaires : `guard={!!session}` / `guard={!session}` — jamais de trou ni de chevauchement entre les deux conditions.
+43. Vérifier `typedRoutes: true` dans `app.json` (actif par défaut sur le template SDK 54) — https://docs.expo.dev/router/advanced/typed-routes/
+44. Valider les typed routes en testant qu'un `href` invalide devient une erreur TypeScript à la compilation.
+45. Vérifier le `scheme` dans `app.json` (généré automatiquement depuis le nom du projet) — https://docs.expo.dev/guides/deep-linking/
+46. Documenter chaque route deep-link supportée dans `docs/DECISIONS.md` au fur et à mesure, avant d'en avoir besoin pour les notifications push.
+
+## Notes Stage 3
+
+47. Test deep link réel (`npx uri-scheme open`) différé — nécessite un simulateur iOS ou émulateur Android non disponible dans l'environnement de dev actuel.
