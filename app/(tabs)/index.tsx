@@ -1,38 +1,15 @@
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import { View, Text } from 'react-native';
 
 export default function HomeScreen() {
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>Welcome!</Text>
+    <View className="flex-1 bg-background items-center justify-center gap-4">
+      <View className="bg-card border border-border rounded-lg p-6">
+        <Text className="text-foreground text-xl font-bold">Test Card</Text>
+        <Text className="text-muted-foreground mt-2">If this looks styled, tokens work.</Text>
       </View>
-      <View style={styles.stepContainer}>
-        <Text>This is a placeholder home screen — Stage 0 in progress.</Text>
+      <View className="bg-primary px-6 py-3 rounded-md">
+        <Text className="text-primary-foreground font-semibold">Primary Button</Text>
       </View>
-    </ScrollView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: "#fff",
-    height: '100%',
-    flexDirection: 'column',
-    justifyContent: 'center',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-});
