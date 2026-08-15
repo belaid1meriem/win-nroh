@@ -33,3 +33,7 @@
 - Using AsyncStorage instead of MMKV for now — MMKV requires a native dev build (incompatible with Expo Go), not worth the setup cost yet. Revisit at Stage 8 (Performance) if needed.
 - Zustand persist middleware uses `createJSONStorage(() => AsyncStorage)` for any store needing persistence (see stores/example-persisted-store.ts as reference pattern).
 - SecureStore reserved for auth tokens only — will be wired in Stage 6.
+
+
+## Stage 5 notes
+- lib/supabase.ts uses AsyncStorage for session storage (per official Supabase/Expo tutorial) — TODO Stage 6: swap to SecureStore adapter for refresh token security (see Stage 0/1 decision on AsyncStorage vs SecureStore).
