@@ -60,12 +60,19 @@ CLAUDE.md
 components/haptic-tab.tsx
 components/ui/icon-symbol.ios.tsx
 components/ui/icon-symbol.tsx
+constants/theme.ts
 docs/DECISIONS.md
+docs/ROADMAP.md
 eslint.config.js
 file.txt
 global.css
 hooks/use-color-scheme.ts
 hooks/use-color-scheme.web.ts
+i18n/index.ts
+i18n/locales/ar.json
+i18n/locales/fr.json
+i18n/set-app-language.ts
+i18n/types.ts
 metro.config.js
 nativewind-env.d.ts
 package.json
@@ -79,6 +86,241 @@ tsconfig.json
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="docs/ROADMAP.md">
+# Roadmap — Configs réalisées
+
+## Stage 0 — Fondations & Tooling
+
+1. Décider la stack et la documenter dans `docs/DECISIONS.md` avant tout code.
+2. Initialiser le projet : `npx create-expo-app@latest . --template default@sdk-54` — https://docs.expo.dev/get-started/create-a-project/
+3. Nettoyer le code de démo du template (si présent) avec `git rm`.
+4. Vérifier `strict: true` dans `tsconfig.json` (activé par défaut Expo SDK 54) — https://www.typescriptlang.org/tsconfig#strict
+5. Vérifier ESLint via `eslint-config-expo/flat` (préconfiguré) — https://docs.expo.dev/guides/using-eslint/
+6. Vérifier icônes/splash + lancer `npx expo-doctor` — https://docs.expo.dev/develop/user-interface/splash-screen-and-app-icon/
+7. Créer `.env.example` (committé) et vérifier `.gitignore` pour les vrais `.env*` — https://docs.expo.dev/guides/environment-variables/
+
+## Stage 1 — Design System & Theming
+
+8. Installer NativeWind v4 + Tailwind v3 : `npx expo install nativewind tailwindcss@^3 react-native-reanimated react-native-safe-area-context` — https://www.nativewind.dev/docs/getting-started/installation
+9. Créer `babel.config.js` avec `jsxImportSource: 'nativewind'` + plugin Reanimated en dernier — https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started/
+10. Créer `metro.config.js` avec `withNativeWind(config, { input: './global.css' })` — https://www.nativewind.dev/docs/api/with-nativewind
+11. Créer `global.css` avec les 3 directives `@tailwind` (syntaxe v3, pas de bloc `@theme` qui est réservé à v4) — https://tailwindcss.com/docs/upgrade-guide (voir différences v3/v4)
+12. Créer `tailwind.config.js` avec `presets: [require('nativewind/preset')]` + `theme.extend.colors` mappés sur des `var(--color-x)` — https://www.nativewind.dev/docs/customization/colors
+13. Importer `global.css` dans `app/_layout.tsx`.
+14. Créer `providers/theme-provider.tsx` (Context + AsyncStorage) pour un choix persistant light/dark/system — https://docs.expo.dev/develop/user-interface/color-themes/
+15. Supprimer les doublons de source de vérité couleur (`constants/theme.ts`, `hooks/use-theme-color.ts`) — un seul vocabulaire de tokens.
+16. Pour une couleur native brute (ex. React Navigation tab bar), lire la même variable via `useUnstableNativeVariable` — https://www.nativewind.dev/docs/api/vars
+17. Retirer `darkMode: 'class'` de `tailwind.config.js` — casse le suivi système sur NativeWind natif.
+18. **Ne pas** utiliser le pattern CSS `.dark {}` (shadcn/web) pour les tokens dark — non fiable sur natif (bug connu) : https://github.com/nativewind/nativewind/issues/702
+19. Définir les tokens light/dark via `vars()` dans `theme/tokens.ts`, appliqués en `style` sur un `View` racine selon `isDark` — https://www.nativewind.dev/docs/guides/themes
+20. Créer `app/dev/theme-preview.tsx` (route Expo Router automatique) pour valider visuellement chaque primitive UI en light/dark + switch de mode.
+
+## Notes environnement (Windows-spécifique)
+
+21. Bug `ERR_UNSUPPORTED_ESM_URL_SCHEME` sous Windows : patcher `metro-config/src/loadConfig.js` avec `pathToFileURL()`, figé via `patch-package` — https://github.com/sindresorhus/patch-package
+22. Bug `Cannot find module 'babel-preset-expo'` (hoisting npm) : le déclarer en dépendance directe via `npx expo install babel-preset-expo`.
+23. Metro annonçant `127.0.0.1` au lieu de l'IP locale : forcer via `$env:REACT_NATIVE_PACKAGER_HOSTNAME` + `--lan`, et ouvrir le port 8081 dans le Pare-feu Windows — https://docs.expo.dev/more/expo-cli/#local-connection-troubleshooting
+</file>
+
+<file path="i18n/index.ts">
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import * as Localization from 'expo-localization';
+import ar from './locales/ar.json';
+import fr from './locales/fr.json';
+import { FALLBACK_LANGUAGE } from './types';
+
+i18n.use(initReactI18next).init({
+  resources: {
+    ar: { translation: ar },
+    fr: { translation: fr },
+  },
+  lng: Localization.getLocales()[0]?.languageCode ?? FALLBACK_LANGUAGE,
+  fallbackLng: FALLBACK_LANGUAGE,
+  interpolation: { escapeValue: false },
+});
+
+export default i18n;
+</file>
+
+<file path="i18n/locales/ar.json">
+{
+  "welcome": "Bienvenue en arabe"
+}
+</file>
+
+<file path="i18n/locales/fr.json">
+{
+  "welcome": "Bienvenue"
+}
+</file>
+
+<file path="i18n/set-app-language.ts">
+import * as Updates from 'expo-updates';
+import { I18nManager } from 'react-native';
+import i18n from '../i18n';
+import { _isRTL, Language } from './types';
+
+export async function setAppLanguage(lang: Language) {
+  const isRTL = _isRTL(lang);
+  await i18n.changeLanguage(lang);
+
+  if (I18nManager.isRTL !== isRTL) {
+    I18nManager.allowRTL(isRTL);
+    I18nManager.forceRTL(isRTL);
+    if (!__DEV__) {
+      await Updates.reloadAsync();
+    }
+  }
+}
+</file>
+
+<file path="i18n/types.ts">
+type Language = 'ar' | 'fr';
+const FALLBACK_LANGUAGE: Language = 'fr';
+const RTLlanguages: Language[] = ['ar'];
+const _isRTL = (lang: Language) => RTLlanguages.includes(lang);
+
+export type { Language };
+export { FALLBACK_LANGUAGE, _isRTL };
+</file>
+
+<file path=".claude/settings.json">
+{
+  "enabledPlugins": {
+    "expo@claude-plugins-official": true
+  }
+}
+</file>
+
+<file path=".env.example">
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
+</file>
+
+<file path="AGENTS.md">
+# Expo HAS CHANGED
+
+Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
+</file>
+
+<file path="CLAUDE.md">
+@AGENTS.md
+</file>
+
+<file path="components/haptic-tab.tsx">
+import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { PlatformPressable } from '@react-navigation/elements';
+import * as Haptics from 'expo-haptics';
+
+export function HapticTab(props: BottomTabBarButtonProps) {
+  return (
+    <PlatformPressable
+      {...props}
+      onPressIn={(ev) => {
+        if (process.env.EXPO_OS === 'ios') {
+          // Add a soft haptic feedback when pressing down on the tabs.
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        props.onPressIn?.(ev);
+      }}
+    />
+  );
+}
+</file>
+
+<file path="components/ui/icon-symbol.ios.tsx">
+import { SymbolView, SymbolViewProps, SymbolWeight } from 'expo-symbols';
+import { StyleProp, ViewStyle } from 'react-native';
+
+export function IconSymbol({
+  name,
+  size = 24,
+  color,
+  style,
+  weight = 'regular',
+}: {
+  name: SymbolViewProps['name'];
+  size?: number;
+  color: string;
+  style?: StyleProp<ViewStyle>;
+  weight?: SymbolWeight;
+}) {
+  return (
+    <SymbolView
+      weight={weight}
+      tintColor={color}
+      resizeMode="scaleAspectFit"
+      name={name}
+      style={[
+        {
+          width: size,
+          height: size,
+        },
+        style,
+      ]}
+    />
+  );
+}
+</file>
+
+<file path="components/ui/icon-symbol.tsx">
+// Fallback for using MaterialIcons on Android and web.
+
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
+import { ComponentProps } from 'react';
+import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
+
+type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
+type IconSymbolName = keyof typeof MAPPING;
+
+/**
+ * Add your SF Symbols to Material Icons mappings here.
+ * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
+ * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
+ */
+const MAPPING = {
+  'house.fill': 'home',
+  'paperplane.fill': 'send',
+  'chevron.left.forwardslash.chevron.right': 'code',
+  'chevron.right': 'chevron-right',
+} as IconMapping;
+
+/**
+ * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
+ * This ensures a consistent look across platforms, and optimal resource usage.
+ * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
+ */
+export function IconSymbol({
+  name,
+  size = 24,
+  color,
+  style,
+}: {
+  name: IconSymbolName;
+  size?: number;
+  color: string | OpaqueColorValue;
+  style?: StyleProp<TextStyle>;
+  weight?: SymbolWeight;
+}) {
+  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+}
+</file>
+
+<file path="eslint.config.js">
+// https://docs.expo.dev/guides/using-eslint/
+const { defineConfig } = require('eslint/config');
+const expoConfig = require('eslint-config-expo/flat');
+
+module.exports = defineConfig([
+  expoConfig,
+  {
+    ignores: ['dist/*'],
+  },
+]);
+</file>
 
 <file path="file.txt">
 <!DOCTYPE html><html lang="en-US" dir="ltr" class="dark h-full" data-applied-theme="dark" data-theme="dark"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="theme-color" content="#4a3066"/><meta name="google-site-verification" content="NuaXoaJOg65EEby46q68Tk2MjKJbImfQvgF8ZWWIyFc"/><meta name="msvalidate.01" content="806C0F5946BE89DCD6BB21AB9A525B34"/><meta name="author" content="ngrok"/><link href="/favicon.ico" rel="shortcut icon" type="image/x-icon"/><link rel="apple-touch-icon" href="/apple-touch-icon.png"/><meta name="app-version" content="21ad0003"/><meta name="darkreader-lock"/><link rel="sitemap" type="application/xml" href="/sitemap.xml"/><link rel="alternate" type="application/rss+xml" title="ngrok blog" href="https://ngrok.com/blog/rss.xml"/><meta property="og:locale" content="en_US"/><meta property="og:type" content="website"/><meta property="og:site_name" content="ngrok.com"/><meta name="twitter:card" content="summary_large_image"/><title>ngrok: deliver your apps, APIs, and AI on local and prod</title><meta property="og:title" content="ngrok: deliver your apps, APIs, and AI on local and prod"/><meta name="twitter:title" content="ngrok: deliver your apps, APIs, and AI on local and prod"/><meta name="description" content="ngrok is developer infrastructure that routes and secures traffic to your apps, APIs, and AI models, wherever they run. Start on localhost, ship to prod."/><meta property="og:description" content="ngrok is developer infrastructure that routes and secures traffic to your apps, APIs, and AI models, wherever they run. Start on localhost, ship to prod."/><meta name="twitter:description" content="ngrok is developer infrastructure that routes and secures traffic to your apps, APIs, and AI models, wherever they run. Start on localhost, ship to prod."/><meta property="og:image" content="https://ngrok.com/assets/home/og-image.png"/><meta name="twitter:image" content="https://ngrok.com/assets/home/og-image.png"/><link rel="canonical" href="https://ngrok.com/"/><meta property="og:url" content="https://ngrok.com/"/><meta name="twitter:url" content="https://ngrok.com/"/><link rel="modulepreload" href="/assets/entry.client-DhYbdc_I.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/react-SIfiwpqq.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/react-dom-x9LNwWQc.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/errorBoundaries-Co3zv71D.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/jsx-runtime-0vZSBttN.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/root-DDkfNT95.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/lib-BTIdx0Pf.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/href-CvyzB0kq.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/cx-IiQEAKf5-D2Qner4y.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/slot-DpNWVci8-DIlv-vK_.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/icon-lZ48P8Nn-Dq4CScP9.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/canonical-origin-BtLdWrjm.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/theme-CVfq037P-C5vYP_Z3.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/tooltip-BZRRJgpm-bJOGZyiM.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/IconBase.es-DMBQDI9J.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/button-Bc0lEOJ2-sVXyFBzB.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/button-CNg69RsV-BtrlGiI5.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/error-page-BLJYi6AI.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/accordion-8K9kElhm.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/CaretDown.es-DjeyLMhc.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/hooks-BHcUrxiv.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/lazy-overlays-BesEkkfD.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/separator-D0D6VyyM-CP60M5_9.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/ArrowRight.es-p8l01Pi6.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/Briefcase.es-WOyiWZH_.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/Buildings.es-ygn1iAwJ.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/CaretRight.es-DHXPwHk5.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/DownloadSimple.es-DmE4cp4p.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/FlowArrow.es-DB9-YftX.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/Globe.es-gz0XxoeU.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/Heart.es-C19yPqNr.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/PlugsConnected.es-QpMada5b.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/ShareFat.es-uIfGJ7RW.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/ShieldCheck.es-2F-UFL7f.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/Sparkle.es-DPqosRzn.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/TerminalWindow.es-sxjstEJP.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/WebhooksLogo.es-D-5V7UME.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/X.es-BIVR-J2o.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/attribution-DJhuyg_1.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/docs-link-21pGsPcN.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/posthog-BHxL9woQ.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/dashboard-link-CLWJP0Lt.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/glow-cta-anchor-BfeOEtR3.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/dist-5ECBLuKV.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/dist-C2Wkr4ol.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/compose-refs-BdBMM9ga-DcgdjsTD.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/dist-BxiEDNi_.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/CircleNotch.es-CAlWFUJR.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/clsx-DUGZgXfJ-BZfiPIcu.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/rainbow-gradient-blur-CObuFfmt.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/rainbow-text-Cu6UMnAF.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/browser-only-CmEEzfU3-vbAuYGLK.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/types-D85fCNV3-DOc6skV4.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/_index-cGtdmv_A.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/CheckCircle.es-Be2Iq6dT.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/json-ld-CMZlWemi.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/title-BVrB7dDe.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/decorative-svg-Dvf2ZMsw.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/logo-loop-C3-DmdLm.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/scroll-depth-tracker-DTFRiHdO.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/spotlight-card-9sOKWWu3.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/testimonials-section-CHulpOyy.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/use-prefers-reduced-motion-Bk5zAfHY-XF-6prRp.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/use-copy-to-clipboard-CSyp4Zk0-4CHEr2bV.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/Check.es-DJEgTaRD.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/Copy.es-BT0cG-sy.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/DotsThree.es-zHfpej7A.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/apple-Bm5PCNTs.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/docker-CncVAwCf.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/windows-CLDdv7Gs.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/dist-C5SWLgbp.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/types-BZ-WE3lR.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/detect-platform-svIo3Q3t.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/love-card-DjjfNQrT.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/dist-C7mK3yut.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="modulepreload" href="/assets/card-BVn8pjfR.js" nonce="dfe974e678c384885cd84a6178eb41e4"/><link rel="stylesheet" id="mantle-dark-styles" href="/assets/mantle-dark-BdjafGXp.css" media="all"/><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://ngrok.com/#website","name":"ngrok","url":"https://ngrok.com"},{"@type":"Organization","@id":"https://ngrok.com/#organization","name":"ngrok","url":"https://ngrok.com","logo":{"@type":"ImageObject","url":"https://ngrok.com/assets/ngrok-logo.png","width":1200,"height":1200},"description":"ngrok is an all-in-one cloud networking platform that secures, transforms, and routes your traffic to services running anywhere.","foundingDate":"2013","sameAs":["https://twitter.com/ngrokHQ","https://github.com/ngrok","https://www.linkedin.com/company/ngrok"],"contactPoint":[{"@type":"ContactPoint","contactType":"sales","url":"https://ngrok.com/contact"},{"@type":"ContactPoint","contactType":"technical support","url":"https://ngrok.com/docs"}],"address":{"@type":"PostalAddress","addressCountry":"US"}},{"@type":"WebPage","@id":"https://ngrok.com/#webpage","name":"ngrok: deliver your apps, APIs, and AI on local and prod","description":"ngrok is developer infrastructure that routes and secures traffic to your apps, APIs, and AI models, wherever they run. Start on localhost, ship to prod.","url":"https://ngrok.com/","inLanguage":"en-US","isPartOf":{"@id":"https://ngrok.com/#website"},"author":{"@id":"https://ngrok.com/#organization"},"publisher":{"@id":"https://ngrok.com/#organization"}},{"@type":"SoftwareApplication","@id":"https://ngrok.com/#software","name":"ngrok","url":"https://ngrok.com/","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","description":"ngrok is developer infrastructure that routes and secures traffic to your apps, APIs, and AI models, wherever they run. Start on localhost, ship to prod.","mainEntityOfPage":{"@id":"https://ngrok.com/#webpage"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"Free tier available"},"featureList":["AI gateway routing any hosted or self-hosted model behind one URL","API gateway with load balancing, WAF, and observability built in","Secure tunnels to services running anywhere with zero open ports","Traffic Policy for routing, transforming, and authenticating requests","SOC 2, HIPAA, and GDPR-ready with SSO, RBAC, and audit logs"],"publisher":{"@id":"https://ngrok.com/#organization"}}]}</script><link nonce="dfe974e678c384885cd84a6178eb41e4" rel="stylesheet" href="/assets/root-BohrxDs7.css"/><script nonce="dfe974e678c384885cd84a6178eb41e4">window.zESettings = {
@@ -507,6 +749,53 @@ import * as route1 from "/assets/_index-cGtdmv_A.js";
 import("/assets/entry.client-DhYbdc_I.js");</script><!--$--><script nonce="dfe974e678c384885cd84a6178eb41e4">window.__reactRouterContext.streamController.enqueue("[{\"_1\":2,\"_3\":-5,\"_4\":-5},\"loaderData\",{\"_5\":6},\"actionData\",\"errors\",\"root\",{\"_7\":8,\"_9\":10,\"_11\":12,\"_13\":14,\"_15\":16,\"_17\":18,\"_19\":-7},\"appVersion\",\"21ad0003\",\"rumEnabled\",true,\"gtmId\",\"GTM-P4F37ZW\",\"ketchTagId\",\"ngrok_ketch_tag\",\"postHogKey\",\"phc_mUGMN4JlTzthGcz0XNK0z6NKUqdeQMn7rPRAM3mifjQ\",\"postHogHost\",\"https://e.ngrok.com\",\"postHogUiHost\"]\n");</script><!--$--><script nonce="dfe974e678c384885cd84a6178eb41e4">window.__reactRouterContext.streamController.close();</script><!--/$--><!--/$--></body></html>
 </file>
 
+<file path="hooks/use-color-scheme.ts">
+export { useColorScheme } from 'react-native';
+</file>
+
+<file path="hooks/use-color-scheme.web.ts">
+import { useEffect, useState } from 'react';
+import { useColorScheme as useRNColorScheme } from 'react-native';
+
+/**
+ * To support static rendering, this value needs to be re-calculated on the client side for web
+ */
+export function useColorScheme() {
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  const colorScheme = useRNColorScheme();
+
+  if (hasHydrated) {
+    return colorScheme;
+  }
+
+  return 'light';
+}
+</file>
+
+<file path="patches/metro-config+0.83.3.patch">
+diff --git a/node_modules/metro-config/src/loadConfig.js b/node_modules/metro-config/src/loadConfig.js
+index 7ac9d88..ef77ace 100644
+--- a/node_modules/metro-config/src/loadConfig.js
++++ b/node_modules/metro-config/src/loadConfig.js
+@@ -279,7 +279,10 @@ async function loadConfigFile(absolutePath) {
+   const extension = path.extname(absolutePath);
+   if (JS_EXTENSIONS.has(extension) || TS_EXTENSIONS.has(extension)) {
+     try {
+-      const configModule = require(absolutePath);
++      const { pathToFileURL } = require('url');
++      const configModule = await import(
++        process.platform === 'win32' ? pathToFileURL(absolutePath).href : absolutePath
++      );
+       if (absolutePath.endsWith(PACKAGE_JSON)) {
+         config = configModule[PACKAGE_JSON_PROP_NAME];
+       } else {
+</file>
+
 <file path="providers/theme-provider.tsx">
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Appearance, useColorScheme as useSystemColorScheme } from 'react-native';
@@ -574,272 +863,6 @@ export function useTheme() {
   if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
   return ctx;
 }
-</file>
-
-<file path=".claude/settings.json">
-{
-  "enabledPlugins": {
-    "expo@claude-plugins-official": true
-  }
-}
-</file>
-
-<file path=".env.example">
-EXPO_PUBLIC_SUPABASE_URL=
-EXPO_PUBLIC_SUPABASE_ANON_KEY=
-</file>
-
-<file path="AGENTS.md">
-# Expo HAS CHANGED
-
-Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
-</file>
-
-<file path="app.json">
-{
-  "expo": {
-    "name": "win-nroh",
-    "slug": "win-nroh",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "winnroh",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png",
-      "bundler": "metro"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ]
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
-  }
-}
-</file>
-
-<file path="babel.config.js">
-module.exports = function (api) {
-  api.cache(true);
-  return {
-    presets: [
-      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
-      "nativewind/babel",
-    ],
-  };
-};
-</file>
-
-<file path="CLAUDE.md">
-@AGENTS.md
-</file>
-
-<file path="components/haptic-tab.tsx">
-import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
-import { PlatformPressable } from '@react-navigation/elements';
-import * as Haptics from 'expo-haptics';
-
-export function HapticTab(props: BottomTabBarButtonProps) {
-  return (
-    <PlatformPressable
-      {...props}
-      onPressIn={(ev) => {
-        if (process.env.EXPO_OS === 'ios') {
-          // Add a soft haptic feedback when pressing down on the tabs.
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-        props.onPressIn?.(ev);
-      }}
-    />
-  );
-}
-</file>
-
-<file path="components/ui/icon-symbol.ios.tsx">
-import { SymbolView, SymbolViewProps, SymbolWeight } from 'expo-symbols';
-import { StyleProp, ViewStyle } from 'react-native';
-
-export function IconSymbol({
-  name,
-  size = 24,
-  color,
-  style,
-  weight = 'regular',
-}: {
-  name: SymbolViewProps['name'];
-  size?: number;
-  color: string;
-  style?: StyleProp<ViewStyle>;
-  weight?: SymbolWeight;
-}) {
-  return (
-    <SymbolView
-      weight={weight}
-      tintColor={color}
-      resizeMode="scaleAspectFit"
-      name={name}
-      style={[
-        {
-          width: size,
-          height: size,
-        },
-        style,
-      ]}
-    />
-  );
-}
-</file>
-
-<file path="components/ui/icon-symbol.tsx">
-// Fallback for using MaterialIcons on Android and web.
-
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
-import { ComponentProps } from 'react';
-import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
-
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
-type IconSymbolName = keyof typeof MAPPING;
-
-/**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
- */
-const MAPPING = {
-  'house.fill': 'home',
-  'paperplane.fill': 'send',
-  'chevron.left.forwardslash.chevron.right': 'code',
-  'chevron.right': 'chevron-right',
-} as IconMapping;
-
-/**
- * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
- */
-export function IconSymbol({
-  name,
-  size = 24,
-  color,
-  style,
-}: {
-  name: IconSymbolName;
-  size?: number;
-  color: string | OpaqueColorValue;
-  style?: StyleProp<TextStyle>;
-  weight?: SymbolWeight;
-}) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
-}
-</file>
-
-<file path="eslint.config.js">
-// https://docs.expo.dev/guides/using-eslint/
-const { defineConfig } = require('eslint/config');
-const expoConfig = require('eslint-config-expo/flat');
-
-module.exports = defineConfig([
-  expoConfig,
-  {
-    ignores: ['dist/*'],
-  },
-]);
-</file>
-
-<file path="global.css">
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-</file>
-
-<file path="hooks/use-color-scheme.ts">
-export { useColorScheme } from 'react-native';
-</file>
-
-<file path="hooks/use-color-scheme.web.ts">
-import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
-
-/**
- * To support static rendering, this value needs to be re-calculated on the client side for web
- */
-export function useColorScheme() {
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme;
-  }
-
-  return 'light';
-}
-</file>
-
-<file path="metro.config.js">
-const { getDefaultConfig } = require("expo/metro-config");
-const { withNativeWind } = require('nativewind/metro');
- 
-const config = getDefaultConfig(__dirname)
- 
-module.exports = withNativeWind(config, { input: './global.css' })
-</file>
-
-<file path="nativewind-env.d.ts">
-/// <reference types="nativewind/types" />
-</file>
-
-<file path="patches/metro-config+0.83.3.patch">
-diff --git a/node_modules/metro-config/src/loadConfig.js b/node_modules/metro-config/src/loadConfig.js
-index 7ac9d88..ef77ace 100644
---- a/node_modules/metro-config/src/loadConfig.js
-+++ b/node_modules/metro-config/src/loadConfig.js
-@@ -279,7 +279,10 @@ async function loadConfigFile(absolutePath) {
-   const extension = path.extname(absolutePath);
-   if (JS_EXTENSIONS.has(extension) || TS_EXTENSIONS.has(extension)) {
-     try {
--      const configModule = require(absolutePath);
-+      const { pathToFileURL } = require('url');
-+      const configModule = await import(
-+        process.platform === 'win32' ? pathToFileURL(absolutePath).href : absolutePath
-+      );
-       if (absolutePath.endsWith(PACKAGE_JSON)) {
-         config = configModule[PACKAGE_JSON_PROP_NAME];
-       } else {
 </file>
 
 <file path="README.md">
@@ -1010,18 +1033,6 @@ rl.question(
 );
 </file>
 
-<file path="tailwind.config.js">
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}'],
-  presets: [require('nativewind/preset')],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-};
-</file>
-
 <file path=".gitignore">
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
@@ -1071,37 +1082,56 @@ app-example
 /android
 </file>
 
-<file path="app/_layout.tsx">
-import '../global.css';
-import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-import { ThemeProvider, useTheme } from '@/providers/theme-provider';
-
-function RootLayoutNav() {
-  const { isDark } = useTheme();
-  return (
-    <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </NavigationThemeProvider>
-  );
-}
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
-export default function RootLayout() {
-  return (
-    <ThemeProvider>
-      <RootLayoutNav />
-    </ThemeProvider>
-  );
+<file path="app.json">
+{
+  "expo": {
+    "name": "win-nroh",
+    "slug": "win-nroh",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "winnroh",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-localization"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
 }
 </file>
 
@@ -1134,6 +1164,219 @@ const styles = StyleSheet.create({
 });
 </file>
 
+<file path="babel.config.js">
+module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: [
+      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
+      "nativewind/babel",
+    ],
+  };
+};
+</file>
+
+<file path="global.css">
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+</file>
+
+<file path="metro.config.js">
+const { getDefaultConfig } = require("expo/metro-config");
+const { withNativeWind } = require('nativewind/metro');
+ 
+const config = getDefaultConfig(__dirname)
+ 
+module.exports = withNativeWind(config, { input: './global.css' })
+</file>
+
+<file path="nativewind-env.d.ts">
+/// <reference types="nativewind/types" />
+</file>
+
+<file path="tailwind.config.js">
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}'],
+  presets: [require('nativewind/preset')],
+  theme: {
+    extend: {
+      colors: {
+        background: 'var(--color-background)',
+        foreground: 'var(--color-foreground)',
+        card: {
+          DEFAULT: 'var(--color-card)',
+          foreground: 'var(--color-card-foreground)',
+        },
+        popover: {
+          DEFAULT: 'var(--color-popover)',
+          foreground: 'var(--color-popover-foreground)',
+        },
+        primary: {
+          DEFAULT: 'var(--color-primary)',
+          foreground: 'var(--color-primary-foreground)',
+        },
+        secondary: {
+          DEFAULT: 'var(--color-secondary)',
+          foreground: 'var(--color-secondary-foreground)',
+        },
+        muted: {
+          DEFAULT: 'var(--color-muted)',
+          foreground: 'var(--color-muted-foreground)',
+        },
+        accent: {
+          DEFAULT: 'var(--color-accent)',
+          foreground: 'var(--color-accent-foreground)',
+        },
+        destructive: {
+          DEFAULT: 'var(--color-destructive)',
+          foreground: 'var(--color-destructive-foreground)',
+        },
+        border: 'var(--color-border)',
+        input: 'var(--color-input)',
+        ring: 'var(--color-ring)',
+      },
+    },
+  },
+  plugins: [],
+};
+</file>
+
+<file path="tsconfig.json">
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
+  ]
+}
+</file>
+
+<file path="app/_layout.tsx">
+import '../global.css';
+import '../i18n/index';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import 'react-native-reanimated';
+import { ThemeProvider, useTheme } from '@/providers/theme-provider';
+import { themes } from '@/constants/theme';
+import { View } from 'react-native';
+
+
+function RootLayoutNav() {
+  const { isDark } = useTheme();
+
+  return (
+    <View style={themes[isDark ? 'dark' : 'light']} className="flex-1">
+      <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+      </NavigationThemeProvider>
+    </View>
+  );
+}
+
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutNav />
+    </ThemeProvider>
+  );
+}
+</file>
+
+<file path="constants/theme.ts">
+import { vars } from 'nativewind';
+
+export const themes = {
+  light: vars({
+    '--color-background': '#FFFFFF',
+    '--color-foreground': '#111827',
+    '--color-card': '#FFFFFF',
+    '--color-card-foreground': '#111827',
+    '--color-popover': '#FFFFFF',
+    '--color-popover-foreground': '#111827',
+    '--color-primary': '#0A7EA4',
+    '--color-primary-foreground': '#FFFFFF',
+    '--color-secondary': '#6B7280',
+    '--color-secondary-foreground': '#FFFFFF',
+    '--color-muted': '#F3F4F6',
+    '--color-muted-foreground': '#6B7280',
+    '--color-accent': '#F3F4F6',
+    '--color-accent-foreground': '#111827',
+    '--color-destructive': '#EF4444',
+    '--color-destructive-foreground': '#FFFFFF',
+    '--color-border': '#E5E7EB',
+    '--color-input': '#E5E7EB',
+    '--color-ring': '#0A7EA4',
+  }),
+  dark: vars({
+    '--color-background': '#111827',
+    '--color-foreground': '#F9FAFB',
+    '--color-card': '#1F2937',
+    '--color-card-foreground': '#F9FAFB',
+    '--color-popover': '#1F2937',
+    '--color-popover-foreground': '#F9FAFB',
+    '--color-primary': '#3B82F6',
+    '--color-primary-foreground': '#FFFFFF',
+    '--color-secondary': '#9CA3AF',
+    '--color-secondary-foreground': '#111827',
+    '--color-muted': '#374151',
+    '--color-muted-foreground': '#9CA3AF',
+    '--color-accent': '#374151',
+    '--color-accent-foreground': '#F9FAFB',
+    '--color-destructive': '#F87171',
+    '--color-destructive-foreground': '#111827',
+    '--color-border': '#374151',
+    '--color-input': '#374151',
+    '--color-ring': '#3B82F6',
+  }),
+};
+</file>
+
+<file path="docs/DECISIONS.md">
+# Decisions
+
+| Concern | Choice | Why |
+|---|---|---|
+| Framework | Expo (managed, EAS Build) | OTA updates, cloud builds, no native config until we need a custom native module |
+| Styling | NativeWind v4 stable + Tailwind v3 | Stable, unchanging token contract |
+| UI primitives | react-native-reusables | Matches NativeWind, we own the component code |
+| Navigation | Expo Router | File-based, typed routes, deep linking |
+| Server state | TanStack Query | No hand-rolled loading/error/cache state |
+| Client state | Zustand | Minimal boilerplate, works with persistence middleware |
+| Persistence | AsyncStorage (hot-path state) / SecureStore (tokens/secrets) | AsyncStorage easier to test with Expo, no prebuild needed |
+| Forms | react-hook-form + zod | Type-safe validation, minimal re-renders |
+| Backend | Supabase | Generate TS types from schema |
+| i18n | i18next + react-i18next + expo-localization | See Stage 2 for RTL |
+
+
+## Notes
+- SDK 54 template (as of Aug 2026) ships without the old demo files (explore/hello-wave/parallax/etc.) — Stage 0.2 cleanup step skipped, nothing to remove.
+- Windows + metro-config: `metro-config/src/loadConfig.js` uses a raw `import(absolutePath)` on Windows absolute paths, which Node's ESM loader rejects (`ERR_UNSUPPORTED_ESM_URL_SCHEME`). Patched via patch-package to wrap with `pathToFileURL()`. See patches/metro-config+0.83.3.patch. Do not remove.
+- Dark mode: CSS `.dark {}` selector approach (shadcn web pattern) is unreliable on native NativeWind (GitHub issue #702). Using `vars()` + wrapping View instead — see theme/tokens.ts.
+</file>
+
 <file path="package.json">
 {
   "name": "win-nroh",
@@ -1160,16 +1403,20 @@ const styles = StyleSheet.create({
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
     "expo-linking": "~8.0.12",
+    "expo-localization": "~17.0.9",
     "expo-router": "~6.0.24",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
+    "expo-updates": "~29.0.19",
     "expo-web-browser": "~15.0.11",
+    "i18next": "^26.3.6",
     "nativewind": "^4.2.6",
     "prettier-plugin-tailwindcss": "^0.5.14",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-i18next": "^17.0.11",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-reanimated": "~4.1.1",
@@ -1190,27 +1437,6 @@ const styles = StyleSheet.create({
 }
 </file>
 
-<file path="tsconfig.json">
-{
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "strict": true,
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
-    "nativewind-env.d.ts"
-  ]
-}
-</file>
-
 <file path="app/(tabs)/_layout.tsx">
 import { Tabs } from 'expo-router';
 import React from 'react';
@@ -1225,7 +1451,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: primaryColor,
-        headerShown: false,
+        headerShown: true,
         tabBarButton: HapticTab,
       }}>
       <Tabs.Screen
@@ -1241,66 +1467,29 @@ export default function TabLayout() {
 </file>
 
 <file path="app/(tabs)/index.tsx">
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { setAppLanguage } from '@/i18n/set-app-language';
 
 export default function HomeScreen() {
+  const { t, i18n } = useTranslation();
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>Welcome!</Text>
+    <View className="flex-1 bg-background items-center justify-center gap-4">
+      <Text className="text-foreground text-xl font-bold">{t('welcome')}</Text>
+      <Text className="text-muted-foreground">Current: {i18n.language}</Text>
+
+      <View className="flex-row gap-2">
+        <Pressable onPress={() => setAppLanguage('fr')} className="bg-primary px-4 py-2 rounded-md">
+          <Text className="text-primary-foreground">Français</Text>
+        </Pressable>
+        <Pressable onPress={() => setAppLanguage('ar')} className="bg-primary px-4 py-2 rounded-md">
+          <Text className="text-primary-foreground">العربية</Text>
+        </Pressable>
       </View>
-      <View style={styles.stepContainer}>
-        <Text>This is a placeholder home screen — Stage 0 in progress.</Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: "#fff",
-    height: '100%',
-    flexDirection: 'column',
-    justifyContent: 'center',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-});
-</file>
-
-<file path="docs/DECISIONS.md">
-# Decisions
-
-| Concern | Choice | Why |
-|---|---|---|
-| Framework | Expo (managed, EAS Build) | OTA updates, cloud builds, no native config until we need a custom native module |
-| Styling | NativeWind v4 stable + Tailwind v3 | Stable, unchanging token contract |
-| UI primitives | react-native-reusables | Matches NativeWind, we own the component code |
-| Navigation | Expo Router | File-based, typed routes, deep linking |
-| Server state | TanStack Query | No hand-rolled loading/error/cache state |
-| Client state | Zustand | Minimal boilerplate, works with persistence middleware |
-| Persistence | AsyncStorage (hot-path state) / SecureStore (tokens/secrets) | AsyncStorage easier to test with Expo, no prebuild needed |
-| Forms | react-hook-form + zod | Type-safe validation, minimal re-renders |
-| Backend | Supabase | Generate TS types from schema |
-| i18n | i18next + react-i18next + expo-localization | See Stage 2 for RTL |
-
-
-## Notes
-- SDK 54 template (as of Aug 2026) ships without the old demo files (explore/hello-wave/parallax/etc.) — Stage 0.2 cleanup step skipped, nothing to remove.
-- Windows + metro-config: `metro-config/src/loadConfig.js` uses a raw `import(absolutePath)` on Windows absolute paths, which Node's ESM loader rejects (`ERR_UNSUPPORTED_ESM_URL_SCHEME`). Patched via patch-package to wrap with `pathToFileURL()`. See patches/metro-config+0.83.3.patch. Do not remove.
 </file>
 
 </files>
