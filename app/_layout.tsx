@@ -9,17 +9,24 @@ import { ThemeProvider, useTheme } from '@/providers/theme-provider';
 import { themes } from '@/constants/theme';
 import { View } from 'react-native';
 import { initI18n } from '@/i18n';
+import { SessionProvider, useSession } from '@/providers/session-provider';
 
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const { isDark } = useTheme();
+  const { session } = useSession();
   return (
     <View style={themes[isDark ? 'dark' : 'light']} className="flex-1">
       <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
         <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Protected guard={!!session}>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack.Protected>
+          <Stack.Protected guard={!session}>
+            <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+          </Stack.Protected>
         </Stack>
         <StatusBar style={isDark ? 'light' : 'dark'} />
       </NavigationThemeProvider>
@@ -45,7 +52,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <RootLayoutNav />
+      <SessionProvider>
+        <RootLayoutNav />
+      </SessionProvider>
     </ThemeProvider>
   );
 }

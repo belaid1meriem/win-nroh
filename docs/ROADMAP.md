@@ -31,3 +31,24 @@
 21. Bug `ERR_UNSUPPORTED_ESM_URL_SCHEME` sous Windows : patcher `metro-config/src/loadConfig.js` avec `pathToFileURL()`, figé via `patch-package` — https://github.com/sindresorhus/patch-package
 22. Bug `Cannot find module 'babel-preset-expo'` (hoisting npm) : le déclarer en dépendance directe via `npx expo install babel-preset-expo`.
 23. Metro annonçant `127.0.0.1` au lieu de l'IP locale : forcer via `$env:REACT_NATIVE_PACKAGER_HOSTNAME` + `--lan`, et ouvrir le port 8081 dans le Pare-feu Windows — https://docs.expo.dev/more/expo-cli/#local-connection-troubleshooting
+
+
+## Stage 2 — Internationalisation & RTL
+
+24. Lire la doc i18next Quick Start avant tout code — https://react.i18next.com/guides/quick-start
+25. Lire la doc Expo Localization pour la détection de locale — https://docs.expo.dev/versions/latest/sdk/localization/
+26. Lire la doc React Native `I18nManager` pour comprendre `isRTL`/`allowRTL`/`forceRTL` — https://reactnative.dev/docs/i18nmanager
+27. Installer : `npx expo install expo-localization` puis `npm install i18next react-i18next` — https://react.i18next.com/guides/quick-start
+28. Créer les fichiers de traduction `i18n/locales/ar.json` et `i18n/locales/fr.json`.
+29. Centraliser `FALLBACK_LANGUAGE` et la détection RTL dans `i18n/types.ts` — une seule source de vérité, pas de valeur par défaut dupliquée.
+30. Créer `i18n/index.ts` avec l'init i18next + `expo-localization` pour la langue initiale.
+31. Installer `expo-updates` (nécessaire pour redémarrer l'app après un flip RTL) : `npx expo install expo-updates` — https://docs.expo.dev/versions/latest/sdk/updates/
+32. Créer `i18n/set-app-language.ts` : `allowRTL()` + `forceRTL()` + `Updates.reloadAsync()` (uniquement hors `__DEV__`, le flip RTL ne peut pas être simulé fiablement en Expo Go).
+33. **Piège à retenir** : `I18nManager.isRTL` est calculé par le natif au démarrage — pas une valeur qu'on assigne, elle ne se met à jour qu'après un vrai redémarrage natif de l'app.
+34. Ajouter la persistance du choix de langue via AsyncStorage dans `set-app-language.ts` — https://react-native-async-storage.github.io/async-storage/docs/usage/
+35. Rendre l'init i18next asynchrone (lecture AsyncStorage avant `i18n.init()`) pour éviter un flash de la mauvaise langue au démarrage.
+36. Gater le rendu de l'app derrière cette init avec `expo-splash-screen` (`preventAutoHideAsync` / `hideAsync`) — https://docs.expo.dev/versions/latest/sdk/splash-screen/
+
+## Notes Stage 2
+
+37. Vérification visuelle du flip RTL et du switch de langue **différée au Stage 10 (EAS Build)** — Expo Go ne peut pas simuler un redémarrage natif complet.
