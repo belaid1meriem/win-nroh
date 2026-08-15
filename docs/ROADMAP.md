@@ -69,3 +69,35 @@
 ## Notes Stage 3
 
 47. Test deep link réel (`npx uri-scheme open`) différé — nécessite un simulateur iOS ou émulateur Android non disponible dans l'environnement de dev actuel.
+
+
+
+## Stage 4 — State Management
+
+48. Décider AsyncStorage vs MMKV avant d'installer quoi que ce soit — MMKV nécessite un dev build natif, incompatible avec Expo Go. Rester sur AsyncStorage tant que ce n'est pas un vrai besoin de perf (revoir au Stage 8).
+49. Installer TanStack Query : `npm install @tanstack/react-query` — https://tanstack.com/query/latest/docs/framework/react/quick-start
+50. Installer Zustand : `npx expo install zustand` — https://github.com/pmndrs/zustand
+51. Créer `providers/query-provider.tsx` avec un `QueryClient` unique, config partagée (`staleTime`, `gcTime`, `retry`) — pas de config redéfinie par hook.
+52. Créer un store Zustand minimal pour valider le pattern avant toute vraie feature — réservé au state client uniquement, jamais aux données serveur (ça, c'est le rôle de Query).
+53. Pour un store qui doit persister : middleware `persist` + `createJSONStorage(() => AsyncStorage)` — https://zustand.docs.pmnd.rs/reference/middlewares/persist
+54. Utiliser `partialize` pour exclure du state persisté : les fonctions, et tout état transitoire/UI (`isLoading`, `modalOpen`, erreurs temporaires) qui n'a plus de sens après un redémarrage.
+55. Réserver SecureStore aux tokens d'authentification uniquement — sera câblé au Stage 6.
+
+## Notes Stage 4
+
+56. `partialize` filtre uniquement la *forme* de ce qui est écrit sur disque — un changement d'un champ non persisté déclenche quand même une écriture, `partialize` ne réduit pas la fréquence d'écriture, seulement son contenu.
+57. Sélecteurs partout, jamais de destructuring complet du store dans un composant — `useStore((s) => s.user)` et non `const { user } = useStore()`, sinon re-render sur chaque changement du store entier.
+58. Pour plusieurs champs à la fois : `useShallow` (Zustand v4.4+/v5), pas l'ancien `shallow` importé séparément — https://zustand.docs.pmnd.rs/hooks/use-shallow
+59. State dérivé (total, isLoggedIn, liste filtrée) jamais stocké tel quel — soit calculé inline via sélecteur dans le composant, soit via une fonction getter dans le store (`total: () => get().items.reduce(...)`), jamais synchronisé manuellement à côté du state source.
+60. Actions colocalisées dans le store, pas de reducers/dispatch séparés — la logique async (fetch, try/catch, isLoading/error) vit directement dans l'action, pas dans le composant appelant.
+61. Un seul store mega vs plusieurs petits stores : trancher tôt. Plusieurs stores (`useAuthStore`, `useCartStore`...) sauf si les slices doivent lire l'état les unes des autres — dans ce cas, pattern slices avec `StateCreator` combiné.
+62. Si pattern slices retenu : chaque slice typée séparément (`StateCreator<FullState, [], [], SliceState>`), combinées dans un seul `create<FullState>()((...a) => ({ ...sliceA(...a), ...sliceB(...a) }))` — jamais de store non typé.
+63. `devtools` middleware pour debug (Flipper/Redux DevTools) — coût nul en prod si bien conditionné, à ajouter seulement si le debugging state devient pénible.
+64. `immer` middleware réservé au state profondément imbriqué — mutation directe (`state.nested.deep.value = v`) au lieu de spread manuel sur plusieurs niveaux. Ne pas ajouter si le state reste plat, complexité inutile.
+
+
+## Hydration (bloque au Stage 6 — auth)
+
+65. `persist` lit le storage de façon async au démarrage — gap entre mount et state réellement chargé. Ne jamais tester `user`/`token` pour une redirection avant `useAuthStore.persist.hasHydrated()` à true, sinon flash de "non connecté" à chaque lancement.
+66. Écran de chargement/splash tant que `hasHydrated()` est false — `onFinishHydration()` pour s'abonner à l'événement, pas de polling.
+67. Prévoir `version` + `migrate` dans les options `persist` dès qu'un champ persisté change de forme — même en dev, éviter les crashs silencieux sur state persisté obsolète au prochain hot reload.
