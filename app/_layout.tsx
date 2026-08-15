@@ -10,6 +10,7 @@ import { themes } from '@/constants/theme';
 import { View } from 'react-native';
 import { initI18n } from '@/i18n';
 import { SessionProvider, useSession } from '@/providers/session-provider';
+import { QueryProvider } from '@/providers/query-provider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -52,9 +53,11 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SessionProvider>
-        <RootLayoutNav />
-      </SessionProvider>
+      <QueryProvider>
+        <SessionProvider>
+          <RootLayoutNav />
+        </SessionProvider>
+      </QueryProvider>
     </ThemeProvider>
   );
 }

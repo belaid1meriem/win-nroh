@@ -27,3 +27,7 @@
 - Used `Stack.Protected` (Expo Router SDK 53+) instead of the roadmap's manual `if (!session) return <Redirect />` pattern — current official doc recommendation, declarative guard with automatic history cleanup. See https://docs.expo.dev/router/advanced/authentication/
 - `SessionProvider` is a placeholder (local state only) until real auth is wired in Stage 6.
 - Deep link testing (`npx uri-scheme open winnroh://...`) requires an iOS simulator or Android emulator — deferred, not available in current dev environment.
+
+
+## Stage 4 notes
+- Using AsyncStorage instead of MMKV for now — MMKV requires a native dev build (incompatible with Expo Go), not worth the setup cost yet. Revisit at Stage 8 (Performance) if needed.
