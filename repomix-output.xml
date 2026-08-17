@@ -46,40 +46,75 @@ The content is organized as follows:
 AGENTS.md
 app.json
 app/_layout.tsx
+app/(auth)/_layout.tsx
+app/(auth)/sign-in.tsx
+app/(auth)/sign-up.tsx
 app/(tabs)/_layout.tsx
 app/(tabs)/index.tsx
-app/modal.tsx
+app/change-password.tsx
+app/forgot-password.tsx
+app/onboarding.tsx
+app/set-preferred-language.tsx
+app/update-password.tsx
 assets/images/android-icon-background.png
 assets/images/android-icon-foreground.png
 assets/images/android-icon-monochrome.png
 assets/images/favicon.png
 assets/images/icon.png
+assets/images/logo.png
+assets/images/onboarding/discover.webp
+assets/images/onboarding/plan.webp
+assets/images/onboarding/save.webp
 assets/images/splash-icon.png
 babel.config.js
 CLAUDE.md
+components.json
 components/haptic-tab.tsx
+components/ui/button.tsx
+components/ui/card.tsx
 components/ui/icon-symbol.ios.tsx
 components/ui/icon-symbol.tsx
-constants/theme.ts
+components/ui/input.tsx
+components/ui/label.tsx
+components/ui/text.tsx
 docs/DECISIONS.md
 docs/ROADMAP.md
 eslint.config.js
 file.txt
 global.css
+hooks/forms/use-sign-in-form.ts
+hooks/forms/use-sign-up-form.ts
 hooks/use-color-scheme.ts
 hooks/use-color-scheme.web.ts
 i18n/index.ts
-i18n/locales/ar.json
-i18n/locales/fr.json
+i18n/locales/ar/auth.json
+i18n/locales/ar/onboarding.json
+i18n/locales/ar/settings.json
+i18n/locales/fr/auth.json
+i18n/locales/fr/onboarding.json
+i18n/locales/fr/settings.json
 i18n/set-app-language.ts
 i18n/types.ts
+i18n/zod-config.ts
+lib/theme.ts
+lib/utils.ts
 metro.config.js
 nativewind-env.d.ts
 package.json
 patches/metro-config+0.83.3.patch
+providers/query-provider.tsx
+providers/session-provider.tsx
 providers/theme-provider.tsx
 README.md
 scripts/reset-project.js
+services/auth-service.ts
+services/user-places-service.ts
+stores/example-store.ts
+stores/onboarding-store.ts
+supabase/.temp/cli-latest
+supabase/.temp/linked-project.json
+supabase/database.ts
+supabase/supabase.ts
 tailwind.config.js
 tsconfig.json
 </directory_structure>
@@ -87,103 +122,1700 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="docs/ROADMAP.md">
-# Roadmap — Configs réalisées
+<file path="app/(auth)/_layout.tsx">
+import { Stack } from 'expo-router';
 
-## Stage 0 — Fondations & Tooling
-
-1. Décider la stack et la documenter dans `docs/DECISIONS.md` avant tout code.
-2. Initialiser le projet : `npx create-expo-app@latest . --template default@sdk-54` — https://docs.expo.dev/get-started/create-a-project/
-3. Nettoyer le code de démo du template (si présent) avec `git rm`.
-4. Vérifier `strict: true` dans `tsconfig.json` (activé par défaut Expo SDK 54) — https://www.typescriptlang.org/tsconfig#strict
-5. Vérifier ESLint via `eslint-config-expo/flat` (préconfiguré) — https://docs.expo.dev/guides/using-eslint/
-6. Vérifier icônes/splash + lancer `npx expo-doctor` — https://docs.expo.dev/develop/user-interface/splash-screen-and-app-icon/
-7. Créer `.env.example` (committé) et vérifier `.gitignore` pour les vrais `.env*` — https://docs.expo.dev/guides/environment-variables/
-
-## Stage 1 — Design System & Theming
-
-8. Installer NativeWind v4 + Tailwind v3 : `npx expo install nativewind tailwindcss@^3 react-native-reanimated react-native-safe-area-context` — https://www.nativewind.dev/docs/getting-started/installation
-9. Créer `babel.config.js` avec `jsxImportSource: 'nativewind'` + plugin Reanimated en dernier — https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started/
-10. Créer `metro.config.js` avec `withNativeWind(config, { input: './global.css' })` — https://www.nativewind.dev/docs/api/with-nativewind
-11. Créer `global.css` avec les 3 directives `@tailwind` (syntaxe v3, pas de bloc `@theme` qui est réservé à v4) — https://tailwindcss.com/docs/upgrade-guide (voir différences v3/v4)
-12. Créer `tailwind.config.js` avec `presets: [require('nativewind/preset')]` + `theme.extend.colors` mappés sur des `var(--color-x)` — https://www.nativewind.dev/docs/customization/colors
-13. Importer `global.css` dans `app/_layout.tsx`.
-14. Créer `providers/theme-provider.tsx` (Context + AsyncStorage) pour un choix persistant light/dark/system — https://docs.expo.dev/develop/user-interface/color-themes/
-15. Supprimer les doublons de source de vérité couleur (`constants/theme.ts`, `hooks/use-theme-color.ts`) — un seul vocabulaire de tokens.
-16. Pour une couleur native brute (ex. React Navigation tab bar), lire la même variable via `useUnstableNativeVariable` — https://www.nativewind.dev/docs/api/vars
-17. Retirer `darkMode: 'class'` de `tailwind.config.js` — casse le suivi système sur NativeWind natif.
-18. **Ne pas** utiliser le pattern CSS `.dark {}` (shadcn/web) pour les tokens dark — non fiable sur natif (bug connu) : https://github.com/nativewind/nativewind/issues/702
-19. Définir les tokens light/dark via `vars()` dans `theme/tokens.ts`, appliqués en `style` sur un `View` racine selon `isDark` — https://www.nativewind.dev/docs/guides/themes
-20. Créer `app/dev/theme-preview.tsx` (route Expo Router automatique) pour valider visuellement chaque primitive UI en light/dark + switch de mode.
-
-## Notes environnement (Windows-spécifique)
-
-21. Bug `ERR_UNSUPPORTED_ESM_URL_SCHEME` sous Windows : patcher `metro-config/src/loadConfig.js` avec `pathToFileURL()`, figé via `patch-package` — https://github.com/sindresorhus/patch-package
-22. Bug `Cannot find module 'babel-preset-expo'` (hoisting npm) : le déclarer en dépendance directe via `npx expo install babel-preset-expo`.
-23. Metro annonçant `127.0.0.1` au lieu de l'IP locale : forcer via `$env:REACT_NATIVE_PACKAGER_HOSTNAME` + `--lan`, et ouvrir le port 8081 dans le Pare-feu Windows — https://docs.expo.dev/more/expo-cli/#local-connection-troubleshooting
+export default function AuthLayout() {
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen 
+        name="sign-in" 
+        options={{
+          // Prevent going back from sign-in
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen 
+        name="sign-up" 
+        options={{
+          // Allow going back to sign-in
+          gestureEnabled: false,
+        }}
+      />
+    </Stack>
+  );
+}
 </file>
 
-<file path="i18n/index.ts">
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import * as Localization from 'expo-localization';
-import ar from './locales/ar.json';
-import fr from './locales/fr.json';
-import { FALLBACK_LANGUAGE } from './types';
+<file path="app/(auth)/sign-in.tsx">
+import { View, Pressable, Image, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback  } from 'react-native';
+import { useState } from 'react';
+import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
+import { Text } from '@/components/ui/text';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useTheme } from '@/providers/theme-provider';
+import { THEME } from '@/lib/theme';
+import { useSignInForm, Controller } from '@/hooks/forms/use-sign-in-form';
 
-i18n.use(initReactI18next).init({
-  resources: {
-    ar: { translation: ar },
-    fr: { translation: fr },
+export default function SignIn() {
+  const { t } = useTranslation('auth');
+  const { isDark } = useTheme();
+  const colors = isDark ? THEME.dark : THEME.light;
+  const [showPassword, setShowPassword] = useState(false);
+
+  const { control, errors, onSubmit, loading, error } = useSignInForm();
+
+  return (
+    <KeyboardAvoidingView 
+    className='flex-1'
+    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    keyboardVerticalOffset={100}
+    >
+    <TouchableWithoutFeedback  className="flex-1"  onPress={Keyboard.dismiss}>
+      <View className="flex-1 bg-background px-6 pt-12">
+
+        <Image
+          source={require('@/assets/images/logo.png')}
+          className="w-36 h-36 mx-auto mb-4"
+        />
+
+        <View className="items-center gap-1 mb-12">
+          <Text className="text-foreground text-2xl font-tajawal-bold">{t('signin.ui.title')}</Text>
+        </View>
+
+        <View className="gap-1 mb-8">
+          <Label className='mb-3'><Text className="text-start font-tajawal-medium">{t('signin.ui.email_label')}</Text></Label>
+          <Controller
+            control={control}
+            name="email"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <Input
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                placeholder="exemple@email.com"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                className="font-tajawal-medium h-12 text-start"
+              />
+            )}
+          />
+          {errors.email && (
+            <Text className="text-destructive text-xs font-tajawal text-start">{errors.email.message}</Text>
+          )}
+        </View>
+
+        <View className="gap-1 mb-2">
+          <Label className='mb-3'><Text className="font-tajawal-medium text-start">{t('signin.ui.password_label')}</Text></Label>
+          <View className="relative justify-center w-full">
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <Input
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  secureTextEntry={!showPassword}
+                  className="h-12 font-tajawal w-full text-start"
+                />
+              )}
+            />
+            <Pressable onPress={() => setShowPassword((v) => !v)} className="absolute end-4">
+              <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
+          {errors.password && (
+            <Text className="text-destructive text-xs font-tajawal text-start">{errors.password.message}</Text>
+          )}
+        </View>
+
+        <Pressable onPress={() => router.push('/forgot-password')} className=" mb-6">
+          <Text className="text-primary text-sm font-tajawal text-start">{t('signin.ui.forgot_password')}</Text>
+        </Pressable>
+
+        {error && (
+          <Text className="text-destructive text-sm text-center mb-3 font-tajawal">{error}</Text>
+        )}
+
+        <Button onPress={onSubmit} disabled={loading} className='mt-4 h-14 rounded-lg '>
+          <Text className="text-primary-foreground font-tajawal-bold text-center ">
+            {loading ? '...' : t('signin.ui.sign_in_button')}
+          </Text>
+        </Button>
+
+        <Pressable onPress={() => router.push('/sign-up')} className="mt-8 items-center">
+          <Text className="text-muted-foreground text-sm font-tajawal">
+            {t('signin.ui.no_account')}{' '}
+            <Text className="text-primary font-tajawal-bold">{t('signin.ui.create_account')}</Text>
+          </Text>
+        </Pressable>
+      </View>
+    </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+}
+</file>
+
+<file path="app/(auth)/sign-up.tsx">
+import { View, Pressable, Image, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, ScrollView } from 'react-native';
+import { useState } from 'react';
+import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/components/ui/text';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useTheme } from '@/providers/theme-provider';
+import { THEME } from '@/lib/theme';
+import { useSignUpForm, Controller } from '@/hooks/forms/use-sign-up-form';
+
+export default function Signup() {
+  const { t } = useTranslation('auth');
+  const { isDark } = useTheme();
+  const colors = isDark ? THEME.dark : THEME.light;
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const { control, errors, onSubmit, loading, error } = useSignUpForm();
+
+  return (
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
+      <KeyboardAvoidingView 
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 100}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} className="flex-1">
+          <ScrollView 
+            className="flex-1"
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View className="px-6 pt-24 pb-8">
+
+              <View className="items-center gap-1 mb-8">
+                <Text className="text-foreground text-2xl font-tajawal-bold">
+                  {t('signup.ui.title')}
+                </Text>
+              </View>
+
+              <View className="gap-1 mb-6">
+                <Label className="mb-3">
+                  <Text className="text-start font-tajawal-medium">
+                    {t('signup.ui.name_label')}
+                  </Text>
+                </Label>
+                <Controller
+                  control={control}
+                  name="name"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <Input
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      placeholder="Belaid Meriem"
+                      autoCapitalize="none"
+                      className="font-tajawal-medium h-12 text-start"
+                    />
+                  )}
+                />
+                {errors.name && (
+                  <Text className="text-destructive text-xs font-tajawal text-start">
+                    {errors.name.message}
+                  </Text>
+                )}
+              </View>
+
+              <View className="gap-1 mb-6">
+                <Label className="mb-3">
+                  <Text className="text-start font-tajawal-medium">
+                    {t('signup.ui.email_label')}
+                  </Text>
+                </Label>
+                <Controller
+                  control={control}
+                  name="email"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <Input
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      placeholder="exemple@email.com"
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      className="font-tajawal-medium h-12 text-start"
+                    />
+                  )}
+                />
+                {errors.email && (
+                  <Text className="text-destructive text-xs font-tajawal text-start">
+                    {errors.email.message}
+                  </Text>
+                )}
+              </View>
+
+              <View className="gap-1 mb-2">
+                <Label className="mb-3">
+                  <Text className="font-tajawal-medium text-start">
+                    {t('signup.ui.password_label')}
+                  </Text>
+                </Label>
+                <View className="relative justify-center w-full">
+                  <Controller
+                    control={control}
+                    name="password"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <Input
+                        value={value}
+                        onChangeText={onChange}
+                        onBlur={onBlur}
+                        secureTextEntry={!showPassword}
+                        className="h-12 font-tajawal w-full text-start"
+                      />
+                    )}
+                  />
+                  <Pressable 
+                    onPress={() => setShowPassword((v) => !v)} 
+                    className="absolute end-4"
+                  >
+                    <Ionicons 
+                      name={showPassword ? 'eye-off' : 'eye'} 
+                      size={20} 
+                      color={colors.mutedForeground} 
+                    />
+                  </Pressable>
+                </View>
+                {errors.password && (
+                  <Text className="text-destructive text-xs font-tajawal text-start">
+                    {errors.password.message}
+                  </Text>
+                )}
+              </View>
+
+              <View className="gap-1 mb-4">
+                <Label className="mb-3">
+                  <Text className="font-tajawal-medium text-start">
+                    {t('signup.ui.confirm_password_label')}
+                  </Text>
+                </Label>
+                <View className="relative justify-center w-full">
+                  <Controller
+                    control={control}
+                    name="confirmPassword"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <Input
+                        value={value}
+                        onChangeText={onChange}
+                        onBlur={onBlur}
+                        secureTextEntry={!showConfirmPassword}
+                        className="h-12 font-tajawal w-full text-start"
+                      />
+                    )}
+                  />
+                  <Pressable
+                    onPress={() => setShowConfirmPassword((v) => !v)}
+                    className="absolute end-4"
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.mutedForeground}
+                    />
+                  </Pressable>
+                </View>
+                {errors.confirmPassword && (
+                  <Text className="text-destructive text-xs font-tajawal text-start">
+                    {errors.confirmPassword.message}
+                  </Text>
+                )}
+              </View>
+
+              <Pressable 
+                onPress={() => router.push('/forgot-password')} 
+                className="mb-6"
+              >
+                <Text className="text-primary text-sm font-tajawal text-start">
+                  {t('signup.ui.forgot_password')}
+                </Text>
+              </Pressable>
+
+              {error && (
+                <Text className="text-destructive text-sm text-center mb-3 font-tajawal">
+                  {error}
+                </Text>
+              )}
+
+              <Button 
+                onPress={onSubmit} 
+                disabled={loading} 
+                className="mt-2 h-14 rounded-lg"
+              >
+                <Text className="text-primary-foreground font-tajawal-bold text-center">
+                  {loading ? '...' : t('signup.ui.sign_in_button')}
+                </Text>
+              </Button>
+
+              <Pressable 
+                onPress={() => router.push('/sign-in')} 
+                className="mt-8 items-center"
+              >
+                <Text className="text-muted-foreground text-sm font-tajawal">
+                  {t('signup.ui.no_account')}{' '}
+                  <Text className="text-primary font-tajawal-bold">
+                    {t('signup.ui.create_account')}
+                  </Text>
+                </Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+</file>
+
+<file path="app/change-password.tsx">
+import { View, Text } from 'react-native'
+import React from 'react'
+
+const ChangePassword = () => {
+  return (
+    <View>
+      <Text>ChangePassword</Text>
+    </View>
+  )
+}
+
+export default ChangePassword
+</file>
+
+<file path="app/forgot-password.tsx">
+import { View, Text } from 'react-native'
+import React from 'react'
+
+const ForgotPassword = () => {
+  return (
+    <View>
+      <Text>ForgotPassword</Text>
+    </View>
+  )
+}
+
+export default ForgotPassword
+</file>
+
+<file path="app/onboarding.tsx">
+import {
+  View,
+  Pressable,
+  ScrollView,
+  Animated,
+  Easing,
+  Image as RNImage,
+} from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { Text } from '@/components/ui/text';
+import { Button } from '@/components/ui/button';
+import { useOnboardingStore } from '@/stores/onboarding-store';
+import { I18nManager } from 'react-native';
+import  { Image }  from 'expo-image'
+
+const onboardingData = [
+  {
+    id: 'discover',
+    image: require('@/assets/images/onboarding/discover.webp'),
   },
-  lng: Localization.getLocales()[0]?.languageCode ?? FALLBACK_LANGUAGE,
-  fallbackLng: FALLBACK_LANGUAGE,
-  interpolation: { escapeValue: false },
+  {
+    id: 'save',
+    image: require('@/assets/images/onboarding/save.webp'),
+  },
+  {
+    id: 'plan',
+    image: require('@/assets/images/onboarding/plan.webp'),
+  },
+];
+
+export default function Onboarding() {
+  const { t } = useTranslation('onboarding');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const completeOnboarding = useOnboardingStore(
+    (state) => state.completeOnboarding
+  );
+
+  const current = onboardingData[currentIndex];
+  const isLast = currentIndex === onboardingData.length - 1;
+
+
+
+  const slideX = useRef(new Animated.Value(0)).current;
+
+  // Handle slide transition
+  useEffect(() => {
+    const isRTL = I18nManager.isRTL;
+    const direction = isRTL ? -1 : 1;
+
+    slideX.setValue(direction * 400);
+
+    Animated.timing(slideX, {
+      toValue: 0,
+      duration: 350,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [currentIndex]);
+
+  const handleNext = () => {
+    if (isLast) {
+      completeOnboarding();
+      router.replace('/set-preferred-language');
+      return;
+    }
+    setCurrentIndex((index) => index + 1);
+  };
+
+  const handleSkip = () => {
+    completeOnboarding();
+    router.replace('/set-preferred-language');
+  };
+
+  return (
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
+      <View className="flex-1 bg-background ">
+        <View className="flex-1 bg-background overflow-hidden">
+          <Animated.View
+            style={{
+              flex: 1,
+              transform: [{ translateX: slideX }],
+            }}
+          >
+            <View className="flex-1 items-center">
+              <View className="flex-1 w-full justify-center">
+                <Text className="text-primary text-5xl font-tajawal-bold text-center">
+                  {t(`slides.${current.id}.title_ar`)}
+                </Text>
+                <Text className="text-foreground text-xl font-tajawal-medium text-center mt-1">
+                  {t(`slides.${current.id}.description_ar`)}
+                </Text>
+                <Text className="text-accent text-2xl font-tajawal-bold text-center mt-6">
+                  {t(`slides.${current.id}.title_fr`)}
+                </Text>
+                <Text className="text-muted-foreground text-lg font-tajawal-medium text-center mt-1">
+                  {t(`slides.${current.id}.description_fr`)}
+                </Text>
+              </View>
+
+              <View className="flex-1 w-full max-h-[60%] relative -top-20">
+                <View className="w-full aspect-square">
+                  <RNImage
+                    key={current.id}
+                    source={current.image}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+
+          <View className="px-5 py-5">
+            <View className="flex-row items-center justify-between">
+              {!isLast ? (
+                <Pressable
+                  onPress={handleSkip}
+                  className="h-10 justify-center px-1"
+                >
+                  <Text className="text-primary font-tajawal-medium text-base">
+                    {t('actions.skip')}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View className="w-14" />
+              )}
+
+              <View className="flex-row items-center gap-1.5">
+                {onboardingData.map((slide, index) => (
+                  <View
+                    key={slide.id}
+                    className={`rounded-full ${
+                      index === currentIndex
+                        ? 'w-2.5 h-2.5 bg-primary'
+                        : 'w-2 h-2 bg-muted'
+                    }`}
+                  />
+                ))}
+              </View>
+
+              <Button
+                onPress={handleNext}
+                className="h-10 rounded-lg px-4"
+                variant="default"
+              >
+                <Text className="text-primary-foreground font-tajawal-medium text-base">
+                  {t(isLast ? 'actions.start' : 'actions.next')}
+                </Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+</file>
+
+<file path="app/set-preferred-language.tsx">
+import { View, Pressable, ScrollView } from 'react-native';
+import { useState } from 'react';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+
+import { Text } from '@/components/ui/text';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { useTheme } from '@/providers/theme-provider';
+import { THEME } from '@/lib/theme';
+import { Language } from '@/i18n/types';
+import { setAppLanguage } from '@/i18n/set-app-language';
+
+const languages: {
+  key: Language;
+  label: string;
+  icon: string;
+  iconClassName: string;
+}[] = [
+  {
+    key: 'ar',
+    label: 'العربية',
+    icon: 'ع',
+    iconClassName: 'text-3xl text-accent',
+  },
+  {
+    key: 'fr',
+    label: 'Français',
+    icon: 'FR',
+    iconClassName: 'text-3xl text-accent',
+  },
+];
+
+export default function LanguageScreen() {
+  const { t, i18n } = useTranslation('settings');
+  const { isDark } = useTheme();
+  const colors = isDark ? THEME.dark : THEME.light;
+
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(
+    i18n.language as Language
+  );
+
+  const handleSave = async () => {
+    await setAppLanguage(selectedLanguage);
+    router.replace('/(auth)/sign-up');
+  };
+
+  return (
+    <View className="flex-1 justify-center bg-background px-5">
+      {/* Title */}
+      <View className="items-center mt-6">
+        <Text className="text-foreground text-2xl font-tajawal-bold text-center">
+          {t('language.title')}
+        </Text>
+      </View>
+
+      {/* Description */}
+      <View className="items-center mt-8 px-4">
+        <Text className="text-muted-foreground text-sm font-tajawal-medium text-center leading-6">
+          {t('language.description')}
+        </Text>
+      </View>
+
+      {/* Languages */}
+      <View className="gap-4 mt-8">
+        {languages.map((language) => {
+          const selected = selectedLanguage === language.key;
+
+          return (
+            <Pressable
+              key={language.key}
+              onPress={() => setSelectedLanguage(language.key)}
+            >
+              <Card
+                className={`h-20 rounded-xl px-4 flex-row items-center bg-background ${
+                  selected
+                    ? 'border-2 border-primary'
+                    : 'border border-border'
+                }`}
+              >
+                <Text
+                  className='font-tajawal-bold text 6xl text-accent'
+                >
+                  {language.icon}
+                </Text>
+
+                <View className="flex-1 ml-3">
+                  <Text className="text-foreground text-base font-tajawal-bold">
+                    {language.label}
+                  </Text>
+                </View>
+
+                {selected && (
+                  <View className="h-5 w-5 rounded-full bg-primary items-center justify-center">
+                    <Ionicons
+                      name="checkmark"
+                      size={13}
+                      color={colors.primaryForeground}
+                    />
+                  </View>
+                )}
+              </Card>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Save */}
+      <Button
+        onPress={handleSave}
+        className="h-14 rounded-xl mt-16"
+      >
+        <Text className="text-primary-foreground font-tajawal-bold text-base">
+          {t('language.save')}
+        </Text>
+      </Button>
+    </View>
+  );
+}
+</file>
+
+<file path="app/update-password.tsx">
+import { View, Text } from 'react-native'
+import React from 'react'
+
+const UpdatePassword = () => {
+  return (
+    <View>
+      <Text>UpdatePassword</Text>
+    </View>
+  )
+}
+
+export default UpdatePassword
+</file>
+
+<file path="components.json">
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.js",
+    "css": "global.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  }
+}
+</file>
+
+<file path="components/ui/button.tsx">
+import { TextClassContext } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { Platform, Pressable } from 'react-native';
+
+const buttonVariants = cva(
+  cn(
+    'group shrink-0 flex-row items-center justify-center gap-2 rounded-md shadow-none',
+    Platform.select({
+      web: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap outline-none transition-all focus-visible:ring-[3px] disabled:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+    })
+  ),
+  {
+    variants: {
+      variant: {
+        default: cn(
+          'bg-primary active:bg-primary/90 shadow-sm shadow-black/5',
+          Platform.select({ web: 'hover:bg-primary/90' })
+        ),
+        destructive: cn(
+          'bg-destructive active:bg-destructive/90 dark:bg-destructive/60 shadow-sm shadow-black/5',
+          Platform.select({
+            web: 'hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
+          })
+        ),
+        outline: cn(
+          'border-border bg-background active:bg-accent dark:bg-input/30 dark:border-input dark:active:bg-input/50 border shadow-sm shadow-black/5',
+          Platform.select({
+            web: 'hover:bg-accent dark:hover:bg-input/50',
+          })
+        ),
+        secondary: cn(
+          'bg-secondary active:bg-secondary/80 shadow-sm shadow-black/5',
+          Platform.select({ web: 'hover:bg-secondary/80' })
+        ),
+        ghost: cn(
+          'active:bg-accent dark:active:bg-accent/50',
+          Platform.select({ web: 'hover:bg-accent dark:hover:bg-accent/50' })
+        ),
+        link: '',
+      },
+      size: {
+        default: cn('h-10 px-4 py-2 sm:h-9', Platform.select({ web: 'has-[>svg]:px-3' })),
+        sm: cn('h-9 gap-1.5 rounded-md px-3 sm:h-8', Platform.select({ web: 'has-[>svg]:px-2.5' })),
+        lg: cn('h-11 rounded-md px-6 sm:h-10', Platform.select({ web: 'has-[>svg]:px-4' })),
+        icon: 'h-10 w-10 sm:h-9 sm:w-9',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+const buttonTextVariants = cva(
+  cn(
+    'text-foreground text-sm font-medium',
+    Platform.select({ web: 'pointer-events-none transition-colors' })
+  ),
+  {
+    variants: {
+      variant: {
+        default: 'text-primary-foreground',
+        destructive: 'text-white',
+        outline: cn(
+          'group-active:text-accent-foreground',
+          Platform.select({ web: 'group-hover:text-accent-foreground' })
+        ),
+        secondary: 'text-secondary-foreground',
+        ghost: 'group-active:text-accent-foreground',
+        link: cn(
+          'text-primary group-active:underline',
+          Platform.select({ web: 'underline-offset-4 hover:underline group-hover:underline' })
+        ),
+      },
+      size: {
+        default: '',
+        sm: '',
+        lg: '',
+        icon: '',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+type ButtonProps = React.ComponentProps<typeof Pressable> & React.RefAttributes<typeof Pressable> & VariantProps<typeof buttonVariants>;
+
+function Button({ className, variant, size, ...props }: ButtonProps) {
+  return (
+    <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
+      <Pressable
+        className={cn(props.disabled && 'opacity-50', buttonVariants({ variant, size }), className)}
+        role="button"
+        {...props}
+      />
+    </TextClassContext.Provider>
+  );
+}
+
+export { Button, buttonTextVariants, buttonVariants };
+export type { ButtonProps };
+</file>
+
+<file path="components/ui/card.tsx">
+import { Text, TextClassContext } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
+import { View } from 'react-native';
+
+function Card({ className, ...props }: React.ComponentProps<typeof View> & React.RefAttributes<View>) {
+  return (
+    <TextClassContext.Provider value="text-card-foreground">
+      <View
+        className={cn(
+          'bg-card border-border flex flex-col gap-6 rounded-xl border py-6 shadow-sm shadow-black/5',
+          className
+        )}
+        {...props}
+      />
+    </TextClassContext.Provider>
+  );
+}
+
+function CardHeader({ className, ...props }: React.ComponentProps<typeof View> & React.RefAttributes<View>) {
+  return <View className={cn('flex flex-col gap-1.5 px-6', className)} {...props} />;
+}
+
+function CardTitle({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<typeof Text> & React.RefAttributes<typeof Text>) {
+
+  return (
+    <Text
+      ref={ref}
+      role="heading"
+      aria-level={3}
+      className={cn('font-semibold leading-none', className)}
+      {...props}
+    />
+  );
+}
+
+function CardDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof Text> & React.RefAttributes<typeof Text>) {
+  return <Text className={cn('text-muted-foreground text-sm', className)} {...props} />;
+}
+
+function CardContent({ className, ...props }: React.ComponentProps<typeof View> & React.RefAttributes<View>) {
+  return <View className={cn('px-6', className)} {...props} />;
+}
+
+function CardFooter({ className, ...props }: React.ComponentProps<typeof View> & React.RefAttributes<View>) {
+  return <View className={cn('flex flex-row items-center px-6', className)} {...props} />;
+}
+
+export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle };
+</file>
+
+<file path="components/ui/input.tsx">
+import { cn } from '@/lib/utils';
+import { Platform, TextInput } from 'react-native';
+
+function Input({ className, ...props }: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInput>) {
+  return (
+    <TextInput
+      className={cn(
+        'dark:bg-input/30 border-input bg-background text-foreground flex h-10 w-full min-w-0 flex-row items-center rounded-md border px-3 py-1 text-base leading-5 shadow-sm shadow-black/5 sm:h-9',
+        props.editable === false &&
+        cn(
+          'opacity-50',
+          Platform.select({ web: 'disabled:pointer-events-none disabled:cursor-not-allowed' })
+        ),
+        Platform.select({
+          web: cn(
+            'placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground outline-none transition-[color,box-shadow] md:text-sm',
+            'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+            'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive'
+          ),
+          native: 'placeholder:text-muted-foreground/50',
+        }),
+        className
+      )}
+      
+      {...props}
+    />
+  );
+}
+
+export { Input };
+</file>
+
+<file path="components/ui/label.tsx">
+import { cn } from '@/lib/utils';
+import * as LabelPrimitive from '@rn-primitives/label';
+import { Platform } from 'react-native';
+
+function Label({
+  className,
+  onPress,
+  onLongPress,
+  onPressIn,
+  onPressOut,
+  disabled,
+  ...props
+}: React.ComponentProps<typeof LabelPrimitive.Text>) {
+  return (
+    <LabelPrimitive.Root
+      className={cn(
+        'flex select-none flex-row items-center gap-2',
+        Platform.select({
+          web: 'cursor-default leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50 group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50',
+        }),
+        disabled && 'opacity-50'
+      )}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      disabled={disabled}>
+      <LabelPrimitive.Text
+        className={cn(
+          'text-foreground text-sm font-medium',
+          Platform.select({ web: 'leading-none' }),
+          className
+        )}
+        {...props}
+      />
+    </LabelPrimitive.Root>
+  );
+}
+
+export { Label };
+</file>
+
+<file path="components/ui/text.tsx">
+import { cn } from '@/lib/utils';
+import { Slot } from '@rn-primitives/slot';
+import { cva, type VariantProps } from 'class-variance-authority';
+import * as React from 'react';
+import { Platform, Text as RNText, type Role } from 'react-native';
+
+const textVariants = cva(
+  cn(
+    'text-foreground text-base',
+    Platform.select({
+      web: 'select-text',
+    })
+  ),
+  {
+    variants: {
+      variant: {
+        default: '',
+        h1: cn(
+          'text-center text-4xl font-extrabold tracking-tight',
+          Platform.select({ web: 'scroll-m-20 text-balance' })
+        ),
+        h2: cn(
+          'border-border border-b pb-2 text-3xl font-semibold tracking-tight',
+          Platform.select({ web: 'scroll-m-20 first:mt-0' })
+        ),
+        h3: cn('text-2xl font-semibold tracking-tight', Platform.select({ web: 'scroll-m-20' })),
+        h4: cn('text-xl font-semibold tracking-tight', Platform.select({ web: 'scroll-m-20' })),
+        p: 'mt-3 leading-7 sm:mt-6',
+        blockquote: 'mt-4 border-l-2 pl-3 italic sm:mt-6 sm:pl-6',
+        code: cn(
+          'bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold'
+        ),
+        lead: 'text-muted-foreground text-xl',
+        large: 'text-lg font-semibold',
+        small: 'text-sm font-medium leading-none',
+        muted: 'text-muted-foreground text-sm',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+    },
+  }
+);
+
+type TextVariantProps = VariantProps<typeof textVariants>;
+
+type TextVariant = NonNullable<TextVariantProps['variant']>;
+
+const ROLE: Partial<Record<TextVariant, Role>> = {
+  h1: 'heading',
+  h2: 'heading',
+  h3: 'heading',
+  h4: 'heading',
+  blockquote: Platform.select({ web: 'blockquote' as Role }),
+  code: Platform.select({ web: 'code' as Role }),
+};
+
+const ARIA_LEVEL: Partial<Record<TextVariant, string>> = {
+  h1: '1',
+  h2: '2',
+  h3: '3',
+  h4: '4',
+};
+
+const TextClassContext = React.createContext<string | undefined>(undefined);
+
+function Text({
+  className,
+  asChild = false,
+  variant = 'default',
+  ...props
+}: React.ComponentProps<typeof RNText> &
+  React.RefAttributes<typeof RNText> &
+  TextVariantProps & {
+    asChild?: boolean;
+  }) {
+  const textClass = React.useContext(TextClassContext);
+  const Component = asChild ? Slot : RNText;
+  return (
+    <Component
+      className={cn(textVariants({ variant }), textClass, className)}
+      role={variant ? ROLE[variant] : undefined}
+      aria-level={variant ? ARIA_LEVEL[variant] : undefined}
+      {...props}
+    />
+  );
+}
+
+export { Text, TextClassContext };
+</file>
+
+<file path="hooks/forms/use-sign-in-form.ts">
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useSession } from '@/providers/session-provider';
+import { type TFunction } from 'i18next';
+import { AuthApiError } from '@supabase/supabase-js';
+
+// Create a function that returns the schema with translations
+const createSignInSchema = (t: TFunction) => z.object({
+  email: z.string().email(t('validation.email.invalid')),
+  password: z.string().min(8, t('validation.password.min')),
 });
 
-export default i18n;
-</file>
+type SignInFormValues = z.infer<ReturnType<typeof createSignInSchema>>;
 
-<file path="i18n/locales/ar.json">
-{
-  "welcome": "Bienvenue en arabe"
+function getAuthErrorMessage(
+  error: unknown,
+  t: TFunction
+) {
+  if (error instanceof AuthApiError) {
+    switch (error.code) {
+      case 'invalid_credentials':
+        return t('signin.errors.invalid_credentials');
+      case 'email_not_confirmed':
+        return t('signin.errors.email_not_confirmed');
+      default:
+        return t('signin.errors.generic');
+    }
+  }
+  return t('signin.errors.generic');
 }
-</file>
 
-<file path="i18n/locales/fr.json">
-{
-  "welcome": "Bienvenue"
+export function useSignInForm() {
+  const { t } = useTranslation('auth');
+  const { signInWithEmail } = useSession();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const signInSchema = createSignInSchema(t);
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignInFormValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: '', password: '' },
+  });
+
+  const onSubmit = handleSubmit(async ({ email, password }) => {
+    setError(null);
+    setLoading(true);
+    try {
+      await signInWithEmail(email, password);
+    } catch (error) {
+      const message = getAuthErrorMessage(error, t);
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  return { control, errors, onSubmit, loading, error };
 }
+
+export { Controller };
 </file>
 
-<file path="i18n/set-app-language.ts">
-import * as Updates from 'expo-updates';
-import { I18nManager } from 'react-native';
-import i18n from '../i18n';
-import { _isRTL, Language } from './types';
+<file path="hooks/forms/use-sign-up-form.ts">
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useSession } from '@/providers/session-provider';
+import { type TFunction } from 'i18next';
+import { AuthApiError } from '@supabase/supabase-js';
 
-export async function setAppLanguage(lang: Language) {
-  const isRTL = _isRTL(lang);
-  await i18n.changeLanguage(lang);
+const createSignUpSchema = (t: TFunction) => z
+  .object({
+    name: z.string().min(2, t('validation.name.min')),
+    email: z.string().email(t('validation.email.invalid')),
+    password: z.string().min(8, t('validation.password.min')),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: t('validation.password.match'),
+    path: ['confirmPassword'],
+  });
 
-  if (I18nManager.isRTL !== isRTL) {
-    I18nManager.allowRTL(isRTL);
-    I18nManager.forceRTL(isRTL);
-    if (!__DEV__) {
-      await Updates.reloadAsync();
+type SignUpFormValues = z.infer<ReturnType<typeof createSignUpSchema>>;
+
+function getAuthErrorMessage(error: unknown, t: TFunction) {
+  if (error instanceof AuthApiError) {
+    switch (error.code) {
+      case 'user_already_exists':
+      case 'email_exists':
+        return t('signup.errors.email_exists');
+      default:
+        return t('signup.errors.generic');
+    }
+  }
+  return t('signup.errors.generic');
+}
+
+export function useSignUpForm() {
+  const { t } = useTranslation('auth');
+  const { signUp } = useSession();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const signUpSchema = createSignUpSchema(t);
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignUpFormValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
+
+  const onSubmit = handleSubmit(
+    async ({ name, email, password }) => {
+      setError(null);
+      setLoading(true);
+
+      try {
+        await signUp(email, password, name);
+      } catch (error) {
+        const message = getAuthErrorMessage(error, t);
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    }
+  );
+
+  return {
+    control,
+    errors,
+    onSubmit,
+    loading,
+    error,
+  };
+}
+
+export { Controller };
+</file>
+
+<file path="i18n/locales/ar/auth.json">
+{
+  "app_name": "Win Nroh",
+  "app_tagline": "وين نروح؟",
+  "sign_in_title": "مرحباً بعودتك!",
+  "email_label": "البريد الإلكتروني",
+  "password_label": "كلمة المرور",
+  "forgot_password": "نسيت كلمة المرور؟",
+  "sign_in_button": "تسجيل الدخول",
+  "no_account": "ليس لديك حساب؟",
+  "create_account": "أنشئ حساباً",
+
+  "validation": {
+    "name": {
+      "min": "يجب أن يحتوي الاسم على حرفين على الأقل"
+    },
+    "email": {
+      "invalid": "يرجى إدخال بريد إلكتروني صحيح"
+    },
+    "password": {
+      "min": "يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل",
+      "match": "كلمتا المرور غير متطابقتين"
+    }
+  },
+
+  "signin": {
+    "errors": {
+      "invalid_credentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+      "email_not_confirmed": "يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول",
+      "user_not_found": "لا يوجد حساب مرتبط بهذا البريد الإلكتروني",
+      "too_many_requests": "محاولات كثيرة جدًا. يرجى المحاولة مرة أخرى لاحقًا",
+      "network": "تعذر الاتصال بالخادم",
+      "generic": "حدث خطأ ما. يرجى المحاولة مرة أخرى"
+    },
+    "ui": {
+      "app_name": "وين نروح؟",
+      "title": "مرحباً بعودتك!",
+      "email_label": "البريد الإلكتروني",
+      "password_label": "كلمة المرور",
+      "forgot_password": "نسيت كلمة المرور؟",
+      "sign_in_button": "تسجيل الدخول",
+      "no_account": "ليس لديك حساب؟",
+      "create_account": "أنشئ حساباً"
+    }
+  },
+
+  "signup": {
+    "errors": {
+      "email_exists": "هذا البريد الإلكتروني مسجل بالفعل",
+      "generic": "حدث خطأ ما. يرجى المحاولة مرة أخرى"
+    },
+    "ui": {
+      "title": "إنشاء حساب جديد",
+      "name_label": "الاسم الكامل",
+      "email_label": "البريد الإلكتروني",
+      "password_label": "كلمة المرور",
+      "confirm_password_label": "تأكيد كلمة المرور",
+      "forgot_password": "نسيت كلمة المرور؟",
+      "sign_in_button": "إنشاء حساب",
+      "no_account": "لديك حساب بالفعل؟",
+      "create_account": "تسجيل الدخول"
     }
   }
 }
 </file>
 
-<file path="i18n/types.ts">
-type Language = 'ar' | 'fr';
-const FALLBACK_LANGUAGE: Language = 'fr';
-const RTLlanguages: Language[] = ['ar'];
-const _isRTL = (lang: Language) => RTLlanguages.includes(lang);
+<file path="i18n/locales/ar/onboarding.json">
+{
+  "slides": {
+    "discover": {
+      "title_ar": "اكتشف",
+      "description_ar": "أماكن جديدة حولك",
+      "title_fr": "Découvrez",
+      "description_fr": "de nouveaux endroits autour de toi"
+    },
+    "save": {
+      "title_ar": "احفظ",
+      "description_ar": "أماكنك المفضلة في مكان واحد",
+      "title_fr": "Enregistre tes",
+      "description_fr": "endroits préférés au même endroit"
+    },
+    "plan": {
+      "title_ar": "خطط",
+      "description_ar": "لنزهاتك القادمة بسهولة",
+      "title_fr": "Planifie",
+      "description_fr": "tes prochaines sorties en toute simplicité"
+    }
+  },
+  "actions": {
+    "skip": "تخطي",
+    "next": "التالي",
+    "start": "ابدأ"
+  }
+}
+</file>
 
-export type { Language };
-export { FALLBACK_LANGUAGE, _isRTL };
+<file path="i18n/locales/ar/settings.json">
+{
+  "language": {
+    "title": "اختر لغتك",
+    "subtitle": "لغة التطبيق",
+    "description": "يمكنك تغيير اللغة في أي وقت من الإعدادات.",
+    "save": "حفظ"
+  }
+}
+</file>
+
+<file path="i18n/locales/fr/auth.json">
+{
+  "app_name": "Win Nroh",
+  "app_tagline": "وين نروح؟",
+  "sign_in_title": "Bon retour !",
+  "email_label": "Email",
+  "password_label": "Mot de passe",
+  "forgot_password": "Mot de passe oublié ?",
+  "sign_in_button": "Se connecter",
+  "no_account": "Pas encore de compte ?",
+  "create_account": "Créer un compte",
+
+  "validation": {
+    "name": {
+      "min": "Le nom doit contenir au moins 2 caractères"
+    },
+    "email": {
+      "invalid": "Veuillez entrer une adresse email valide"
+    },
+    "password": {
+      "min": "Le mot de passe doit contenir au moins 8 caractères",
+      "match": "Les mots de passe ne correspondent pas"
+    }
+  },
+
+  "signin": {
+    "errors": {
+      "invalid_credentials": "Email ou mot de passe incorrect",
+      "email_not_confirmed": "Veuillez confirmer votre adresse email avant de vous connecter",
+      "user_not_found": "Aucun compte ne correspond à cette adresse email",
+      "too_many_requests": "Trop de tentatives. Veuillez réessayer plus tard",
+      "network": "Impossible de se connecter au serveur",
+      "generic": "Une erreur est survenue. Veuillez réessayer"
+    },
+    "ui": {
+      "app_name": "Win Nroh",
+      "title": "Bon retour !",
+      "email_label": "Email",
+      "password_label": "Mot de passe",
+      "forgot_password": "Mot de passe oublié ?",
+      "sign_in_button": "Se connecter",
+      "no_account": "Pas encore de compte ?",
+      "create_account": "Créer un compte"
+    }
+  },
+
+  "signup": {
+    "errors": {
+      "email_exists": "Cette adresse email est déjà utilisée",
+      "generic": "Une erreur est survenue. Veuillez réessayer"
+    },
+    "ui": {
+      "title": "Créer un nouveau compte",
+      "name_label": "Nom complet",
+      "email_label": "Email",
+      "password_label": "Mot de passe",
+      "confirm_password_label": "Confirmer le mot de passe",
+      "forgot_password": "Mot de passe oublié ?",
+      "sign_in_button": "Créer un compte",
+      "no_account": "Vous avez déjà un compte ?",
+      "create_account": "Se connecter"
+    }
+  }
+}
+</file>
+
+<file path="i18n/locales/fr/onboarding.json">
+{
+  "slides": {
+    "discover": {
+      "title_ar": "اكتشف",
+      "description_ar": "أماكن جديدة حولك",
+      "title_fr": "Découvrez",
+      "description_fr": "de nouveaux endroits autour de toi"
+    },
+    "save": {
+      "title_ar": "احفظ",
+      "description_ar": "أماكنك المفضلة في مكان واحد",
+      "title_fr": "Enregistre",
+      "description_fr": "tes endroits préférés au même endroit"
+    },
+    "plan": {
+      "title_ar": "خطط",
+      "description_ar": "لنزهاتك القادمة بسهولة",
+      "title_fr": "Planifie",
+      "description_fr": "tes prochaines sorties en toute simplicité"
+    }
+  },
+  "actions": {
+    "skip": "Passer",
+    "next": "Suivant",
+    "start": "Commencer"
+  }
+}
+</file>
+
+<file path="i18n/locales/fr/settings.json">
+{
+  "language": {
+    "title": "Choisis ta langue",
+    "subtitle": "Langue de l'application",
+    "description": "Tu peux changer la langue à tout moment dans les paramètres.",
+    "save": "Enregistrer"
+  }
+}
+</file>
+
+<file path="i18n/zod-config.ts">
+import * as z from "zod";
+import fr from "zod/v4/locales/fr.js";
+import ar from "zod/v4/locales/ar.js";
+
+const locales = {
+  fr,
+  ar,
+} as const;
+
+export function configureZod(locale: keyof typeof locales) {
+  z.config(locales[locale]());
+}
+</file>
+
+<file path="lib/theme.ts">
+import {
+  DarkTheme,
+  DefaultTheme,
+  type Theme,
+} from '@react-navigation/native';
+
+export const THEME = {
+  light: {
+    // Base
+    background: 'hsl(40 50% 97.6%)',
+    foreground: 'hsl(190 34.3% 13.7%)',
+
+    // Surfaces
+    card: 'hsl(0 0% 100%)',
+    cardForeground: 'hsl(190 34.3% 13.7%)',
+
+    popover: 'hsl(0 0% 100%)',
+    popoverForeground: 'hsl(190 34.3% 13.7%)',
+
+    // Brand
+    primary: 'hsl(185.9 89.2% 29%)',
+    primaryForeground: 'hsl(0 0% 100%)',
+
+    primaryDark: 'hsl(185.9 91.1% 22%)',
+    primaryLight: 'hsl(177.3 47.8% 91%)',
+
+    // Secondary
+    secondary: 'hsl(189 8.9% 43.9%)',
+    secondaryForeground: 'hsl(0 0% 100%)',
+
+    // Muted
+    muted: 'hsl(160 12% 95.1%)',
+    mutedForeground: 'hsl(189 8.9% 43.9%)',
+
+    // Accent
+    accent: 'hsl(26.5 87% 66.9%)',
+    accentLight: 'hsl(27.9 100% 94.5%)',
+    accentForeground: 'hsl(190 34.3% 13.7%)',
+
+    // Status
+    success: 'hsl(103.8 28.8% 42.9%)',
+    successForeground: 'hsl(0 0% 100%)',
+
+    destructive: 'hsl(1.9 62.7% 60%)',
+    destructiveForeground: 'hsl(0 0% 100%)',
+
+    // Borders / Inputs
+    border: 'hsl(168 10.2% 90.4%)',
+    input: 'hsl(168 10.2% 90.4%)',
+    ring: 'hsl(185.9 89.2% 29%)',
+
+    radius: '0.75rem',
+
+    // Charts
+    chart1: 'hsl(185.9 89.2% 29%)',
+    chart2: 'hsl(26.5 87% 66.9%)',
+    chart3: 'hsl(103.8 28.8% 42.9%)',
+    chart4: 'hsl(177.3 47.8% 91%)',
+    chart5: 'hsl(1.9 62.7% 60%)',
+  },
+
+  dark: {
+    // Base
+    background: 'hsl(190 27.3% 8.6%)',
+    foreground: 'hsl(160 14.3% 95.9%)',
+
+    // Surfaces
+    card: 'hsl(188 24.6% 12%)',
+    cardForeground: 'hsl(160 14.3% 95.9%)',
+
+    popover: 'hsl(188 24.6% 12%)',
+    popoverForeground: 'hsl(160 14.3% 95.9%)',
+
+    // Brand
+    primary: 'hsl(183.2 60.2% 42.4%)',
+    primaryForeground: 'hsl(0 0% 100%)',
+
+    primaryDark: 'hsl(183.5 65.8% 31%)',
+    primaryLight: 'hsl(185.2 56.1% 16.1%)',
+
+    // Secondary
+    secondary: 'hsl(183.5 9.6% 65.3%)',
+    secondaryForeground: 'hsl(190 27.3% 8.6%)',
+
+    // Muted
+    muted: 'hsl(189.5 22.9% 16.3%)',
+    mutedForeground: 'hsl(183.5 9.6% 65.3%)',
+
+    // Accent
+    accent: 'hsl(26.5 87% 66.9%)',
+    accentLight: 'hsl(23.1 28.9% 17.6%)',
+    accentForeground: 'hsl(190 27.3% 8.6%)',
+
+    // Status
+    success: 'hsl(103.6 27.5% 52.9%)',
+    successForeground: 'hsl(0 0% 100%)',
+
+    destructive: 'hsl(2 72.1% 67.6%)',
+    destructiveForeground: 'hsl(190 27.3% 8.6%)',
+
+    // Borders / Inputs
+    border: 'hsl(186.7 17.3% 20.4%)',
+    input: 'hsl(186.7 17.3% 20.4%)',
+    ring: 'hsl(183.2 60.2% 42.4%)',
+
+    radius: '0.75rem',
+
+    // Charts
+    chart1: 'hsl(183.2 60.2% 42.4%)',
+    chart2: 'hsl(26.5 87% 66.9%)',
+    chart3: 'hsl(103.6 27.5% 52.9%)',
+    chart4: 'hsl(177.3 47.8% 91%)',
+    chart5: 'hsl(2 72.1% 67.6%)',
+  },
+};
+
+export const NAV_THEME: Record<'light' | 'dark', Theme> = {
+  light: {
+    ...DefaultTheme,
+    colors: {
+      background: THEME.light.background,
+      border: THEME.light.border,
+      card: THEME.light.card,
+      notification: THEME.light.destructive,
+      primary: THEME.light.primary,
+      text: THEME.light.foreground,
+    },
+  },
+
+  dark: {
+    ...DarkTheme,
+    colors: {
+      background: THEME.dark.background,
+      border: THEME.dark.border,
+      card: THEME.dark.card,
+      notification: THEME.dark.destructive,
+      primary: THEME.dark.primary,
+      text: THEME.dark.foreground,
+    },
+  },
+};
+</file>
+
+<file path="lib/utils.ts">
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+</file>
+
+<file path="services/auth-service.ts">
+import { supabase } from '@/supabase/supabase';
+import {
+  AuthResponse,
+  AuthError,
+  AuthTokenResponsePassword,
+  OAuthResponse,
+  UserResponse,
+  Session,
+  AuthChangeEvent,
+  Subscription,
+} from '@supabase/supabase-js';
+import * as Linking from 'expo-linking'; 
+
+const PROVIDERS = ['google'] as const;
+
+export const signUp = async (email: string, password: string, fullName: string): Promise<AuthResponse> => {
+  return await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+      },
+      emailRedirectTo: Linking.createURL('welcome'),
+    },
+  })
+}
+
+
+export const signOut = async () : Promise<{ error: AuthError | null }> => {
+    return await supabase.auth.signOut();
+}
+
+// export const signInWithProvider = async (provider: typeof PROVIDERS[number]) : Promise<OAuthResponse> => {
+//     return await supabase.auth.signInWithOAuth({ provider });
+// }
+
+export const signInWithEmail = async (email: string, password: string) : Promise<AuthTokenResponsePassword> => {
+    return await supabase.auth.signInWithPassword({ email, password });
+}
+
+export const resetPasswordForEmail = async (email: string): Promise<{ data: {} | null; error: AuthError | null }> => {
+  return await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: 'winnroh://update-password',
+  });
+}
+
+export const updatePassword = async (
+  newPassword: string,
+  currentPassword?: string
+): Promise<UserResponse> => {
+  return await supabase.auth.updateUser({
+    password: newPassword,
+    ...(currentPassword ? { current_password: currentPassword } : {}),
+  });
+}
+
+export const getSession = async (): Promise<{ data: { session: Session | null }; error: AuthError | null }> => {
+  return await supabase.auth.getSession();
+}
+
+export const subscribeToAuthChanges = (
+  callback: (event: AuthChangeEvent, session: Session | null) => void
+): Subscription => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
+  return subscription;
+}
+</file>
+
+<file path="stores/onboarding-store.ts">
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
+interface OnboardingState {
+  isCompleted: boolean;
+  completeOnboarding: () => void;
+  resetOnboarding: () => void;
+}
+
+export const useOnboardingStore = create<OnboardingState>()(
+  persist(
+    (set) => ({
+      isCompleted: false,
+
+      completeOnboarding: () => {
+        set({ isCompleted: true });
+      },
+
+      resetOnboarding: () => {
+        set({ isCompleted: false });
+      },
+    }),
+    {
+      name: 'onboarding-store',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);
 </file>
 
 <file path=".claude/settings.json">
@@ -192,11 +1824,6 @@ export { FALLBACK_LANGUAGE, _isRTL };
     "expo@claude-plugins-official": true
   }
 }
-</file>
-
-<file path=".env.example">
-EXPO_PUBLIC_SUPABASE_URL=
-EXPO_PUBLIC_SUPABASE_ANON_KEY=
 </file>
 
 <file path="AGENTS.md">
@@ -777,6 +2404,111 @@ export function useColorScheme() {
 }
 </file>
 
+<file path="i18n/index.ts">
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import * as Localization from 'expo-localization';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import arAuth from './locales/ar/auth.json';
+import frAuth from './locales/fr/auth.json';
+
+import arSettings from './locales/ar/settings.json';
+import frSettings from './locales/fr/settings.json';
+
+import arOnboarding from './locales/ar/onboarding.json';
+import frOnboarding from './locales/fr/onboarding.json';
+
+import {
+  FALLBACK_LANGUAGE,
+  Language,
+  LANGUAGE_STORAGE_KEY,
+} from './types';
+
+import { setAppLanguage } from './set-app-language';
+
+export async function initI18n() {
+  const storedLang = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+
+  const initialLang =
+    storedLang ??
+    Localization.getLocales()[0]?.languageCode ??
+    FALLBACK_LANGUAGE;
+
+  await i18n.use(initReactI18next).init({
+    resources: {
+      ar: {
+        auth: arAuth,
+        settings: arSettings,
+        onboarding: arOnboarding,
+      },
+      fr: {
+        auth: frAuth,
+        settings: frSettings,
+        onboarding: frOnboarding,
+      },
+    },
+
+    ns: ['auth', 'settings', 'onboarding'],
+    defaultNS: 'auth',
+
+    lng: initialLang,
+    fallbackLng: FALLBACK_LANGUAGE,
+
+    interpolation: {
+      escapeValue: false,
+    },
+  });
+
+  await setAppLanguage(initialLang as Language);
+}
+
+export default i18n;
+</file>
+
+<file path="i18n/set-app-language.ts">
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Updates from 'expo-updates';
+import { I18nManager } from 'react-native';
+import i18n from '../i18n';
+import { _isRTL, Language, LANGUAGE_STORAGE_KEY } from './types';
+import { configureZod } from './zod-config';
+
+
+export async function setAppLanguage(lang: Language) {
+  const isRTL = _isRTL(lang);
+  console.log('isRTL: ', isRTL)
+  console.log('I18nManager.isRTL:', I18nManager.isRTL )
+  await i18n.changeLanguage(lang);
+  await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+  console.log('I18nManager.isRTL:', I18nManager.isRTL )
+  if (I18nManager.isRTL !== isRTL) {
+    console.log("HI FROM IF BLOC")
+    I18nManager.allowRTL(isRTL);
+    I18nManager.forceRTL(isRTL);
+    try {
+      await Updates.reloadAsync();
+    } catch (error) {
+      console.log('nvm')
+    }
+    
+  }
+  console.log('I18nManager.isRTL:', I18nManager.isRTL )
+  configureZod(lang);
+}
+</file>
+
+<file path="i18n/types.ts">
+type Language = 'ar' | 'fr';
+const FALLBACK_LANGUAGE: Language = 'fr';
+const RTLlanguages: Language[] = ['ar'];
+const _isRTL = (lang: Language) => RTLlanguages.includes(lang);
+const LANGUAGE_STORAGE_KEY = '@app_language';
+
+export type { Language };
+export { FALLBACK_LANGUAGE, _isRTL, LANGUAGE_STORAGE_KEY };
+</file>
+
 <file path="patches/metro-config+0.83.3.patch">
 diff --git a/node_modules/metro-config/src/loadConfig.js b/node_modules/metro-config/src/loadConfig.js
 index 7ac9d88..ef77ace 100644
@@ -796,13 +2528,134 @@ index 7ac9d88..ef77ace 100644
        } else {
 </file>
 
+<file path="providers/query-provider.tsx">
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      retry: 2,
+    },
+  },
+});
+
+export function QueryProvider({ children }: { children: React.ReactNode }) {
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+
+// // lecture — useQuery
+// const { data, isLoading, error } = useQuery({
+//   queryKey: ['user', userId],       // clé unique = identité du cache
+//   queryFn: () => api.getUser(userId),
+//   staleTime: 5 * 60 * 1000,         // durée avant que la donnée soit "périmée"
+// });
+
+// // écriture — useMutation
+// const mutation = useMutation({
+//   mutationFn: (data) => api.updateUser(userId, data),
+//   onSuccess: () => {
+//     queryClient.invalidateQueries({ queryKey: ['user', userId] }); // force un refetch
+//   },
+// });
+</file>
+
+<file path="providers/session-provider.tsx">
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import {
+  signOut as authSignOut,
+  signInWithEmail as authSignInWithEmail,
+  signUp as authSignUp,
+  getSession,
+  subscribeToAuthChanges,
+  resetPasswordForEmail,
+  updatePassword as authUpdatePassword,
+} from '@/services/auth-service';
+import type { Session, AuthResponse } from '@supabase/supabase-js';
+
+interface SessionContextValue {
+  session: Session | null;
+  isLoading: boolean;
+  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>,
+  updatePassword: (newPassword: string) => Promise<void>,
+  changePassword: (newPassword: string, currentPassword: string) => Promise<void>
+}
+
+const SessionContext = createContext<SessionContextValue | null>(null);
+
+export function SessionProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsLoading(false);
+    });
+
+    const subscription = subscribeToAuthChanges((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signOut = async () => {
+    const { error } = await authSignOut();
+    if (error) throw error;
+  }
+
+
+  const signInWithEmail = async (email: string, password: string) => {
+    const { error } = await authSignInWithEmail(email, password);
+    if(error) throw error
+  }
+
+  const signUp = async (email: string, password: string, fullName: string) : Promise<void> => {
+    const { error } = await authSignUp(email, password, fullName);
+    if (error) throw error
+  }
+
+  const resetPassword = async (email: string) => {
+    const { data, error } = await resetPasswordForEmail(email)
+    if (error) throw error
+  }
+
+  const updatePassword = async (password: string) => {
+    const { data, error } = await authUpdatePassword(password)
+    if (error) throw error
+  }
+  const changePassword = async (newPassword: string, currentPassword: string) => {
+    const { data, error } = await authUpdatePassword(newPassword, currentPassword)
+    if (error) throw error
+  }
+  return (
+    <SessionContext.Provider value={{ session, isLoading, signOut, signInWithEmail, signUp, resetPassword, updatePassword, changePassword }}>
+      {children}
+    </SessionContext.Provider>
+  );
+}
+
+export function useSession() {
+  const ctx = useContext(SessionContext);
+  if (!ctx) throw new Error('useSession must be used within SessionProvider');
+  return ctx;
+}
+</file>
+
 <file path="providers/theme-provider.tsx">
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Appearance, useColorScheme as useSystemColorScheme } from 'react-native';
+import { useColorScheme as useSystemColorScheme } from 'react-native';
 import { useColorScheme as useNativewindColorScheme } from 'nativewind';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ThemeMode = 'light' | 'dark' | 'system';
+
 const STORAGE_KEY = '@theme_mode';
 
 interface ThemeContextValue {
@@ -817,33 +2670,39 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemColorScheme = useSystemColorScheme();
   const { setColorScheme } = useNativewindColorScheme();
+
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
 
-  const applyColorScheme = (mode: ThemeMode) => {
-    if (mode === 'system') {
-      Appearance.setColorScheme(null);
-    } else {
-      setColorScheme(mode);
-    }
-  };
-
   useEffect(() => {
-    (async () => {
+    const loadTheme = async () => {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+
       const mode: ThemeMode =
-        stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+        stored === 'light' || stored === 'dark' || stored === 'system'
+          ? stored
+          : 'system';
+
       setThemeModeState(mode);
-      applyColorScheme(mode);
-    })();
-  }, []);
+      setColorScheme(mode);
+    };
+
+    loadTheme();
+  }, [setColorScheme]);
 
   const setThemeMode = async (mode: ThemeMode) => {
     setThemeModeState(mode);
-    applyColorScheme(mode);
+    setColorScheme(mode);
     await AsyncStorage.setItem(STORAGE_KEY, mode);
   };
 
-  const isDark = themeMode === 'system' ? systemColorScheme === 'dark' : themeMode === 'dark';
+  const isDark =
+    themeMode === 'system'
+      ? systemColorScheme === 'dark'
+      : themeMode === 'dark';
+
+  const toggleTheme = () => {
+    setThemeMode(isDark ? 'light' : 'dark');
+  };
 
   return (
     <ThemeContext.Provider
@@ -851,8 +2710,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         themeMode,
         isDark,
         setThemeMode,
-        toggleTheme: () => setThemeMode(isDark ? 'light' : 'dark'),
-      }}>
+        toggleTheme,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );
@@ -860,7 +2720,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function useTheme() {
   const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
+
+  if (!ctx) {
+    throw new Error('useTheme must be used within ThemeProvider');
+  }
+
   return ctx;
 }
 </file>
@@ -1033,6 +2897,1651 @@ rl.question(
 );
 </file>
 
+<file path="services/user-places-service.ts">
+import { supabase } from '@/supabase/supabase';
+import type { QueryData } from '@supabase/supabase-js';
+import type { Tables, Enums } from '@/supabase/database';
+
+type PlaceStatus = Enums<'place_status'>;
+type UserPlace = Tables<'user_places'>;
+
+const userPlacesQuery = supabase
+  .from('user_places')
+  .select('*, places(*)')
+  .order('added_at', { ascending: false });
+
+type UserPlacesWithPlace = QueryData<typeof userPlacesQuery>;
+
+export const userPlacesService = {
+  async list(): Promise<UserPlacesWithPlace> {
+    const { data, error } = await userPlacesQuery;
+    if (error) throw error;
+    return data;
+  },
+
+  async updateStatus(id: string, status: PlaceStatus): Promise<UserPlace> {
+    const { data, error } = await supabase
+      .from('user_places')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+};
+</file>
+
+<file path="supabase/.temp/cli-latest">
+v2.114.0
+</file>
+
+<file path="supabase/.temp/linked-project.json">
+{"ref":"mmqugnxfffvezuferdde","name":"Win Nroh","organization_id":"jheqgqyilwqlelxqyqlo","organization_slug":"jheqgqyilwqlelxqyqlo"}
+</file>
+
+<file path="supabase/database.ts">
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
+  public: {
+    Tables: {
+      categories: {
+        Row: {
+          color_hex: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_fr: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          color_hex?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_fr: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          color_hex?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_fr?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          related_place_id: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          related_place_id?: string | null
+          title: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          related_place_id?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_related_place_id_fkey"
+            columns: ["related_place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_place_id_fkey"
+            columns: ["related_place_id"]
+            isOneToOne: false
+            referencedRelation: "places_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_photos: {
+        Row: {
+          created_at: string
+          id: string
+          is_cover: boolean
+          place_id: string
+          uploaded_by_user_id: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_cover?: boolean
+          place_id: string
+          uploaded_by_user_id: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_cover?: boolean
+          place_id?: string
+          uploaded_by_user_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_photos_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "place_photos_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "place_photos_uploaded_by_user_id_fkey"
+            columns: ["uploaded_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      places: {
+        Row: {
+          address_text: string | null
+          category_id: string
+          city: string | null
+          cover_photo_url: string | null
+          created_at: string
+          created_by_user_id: string | null
+          geog: unknown
+          id: string
+          latitude: number
+          longitude: number
+          name: string
+          updated_at: string
+          visibility: Database["public"]["Enums"]["place_visibility"]
+          wilaya: string | null
+        }
+        Insert: {
+          address_text?: string | null
+          category_id: string
+          city?: string | null
+          cover_photo_url?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          geog?: unknown
+          id?: string
+          latitude: number
+          longitude: number
+          name: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["place_visibility"]
+          wilaya?: string | null
+        }
+        Update: {
+          address_text?: string | null
+          category_id?: string
+          city?: string | null
+          cover_photo_url?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          geog?: unknown
+          id?: string
+          latitude?: number
+          longitude?: number
+          name?: string
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["place_visibility"]
+          wilaya?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "places_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "places_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string
+          id: string
+          notifications_enabled: boolean
+          preferred_language: Database["public"]["Enums"]["app_language"]
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name: string
+          id: string
+          notifications_enabled?: boolean
+          preferred_language?: Database["public"]["Enums"]["app_language"]
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          notifications_enabled?: boolean
+          preferred_language?: Database["public"]["Enums"]["app_language"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          place_id: string
+          rating: number
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          place_id: string
+          rating: number
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          place_id?: string
+          rating?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spatial_ref_sys: {
+        Row: {
+          auth_name: string | null
+          auth_srid: number | null
+          proj4text: string | null
+          srid: number
+          srtext: string | null
+        }
+        Insert: {
+          auth_name?: string | null
+          auth_srid?: number | null
+          proj4text?: string | null
+          srid: number
+          srtext?: string | null
+        }
+        Update: {
+          auth_name?: string | null
+          auth_srid?: number | null
+          proj4text?: string | null
+          srid?: number
+          srtext?: string | null
+        }
+        Relationships: []
+      }
+      user_places: {
+        Row: {
+          added_at: string
+          id: string
+          is_favorite: boolean
+          personal_notes: string | null
+          personal_rating: number | null
+          place_id: string
+          planned_at: string | null
+          status: Database["public"]["Enums"]["place_status"]
+          updated_at: string
+          user_id: string
+          visited_at: string | null
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          is_favorite?: boolean
+          personal_notes?: string | null
+          personal_rating?: number | null
+          place_id: string
+          planned_at?: string | null
+          status?: Database["public"]["Enums"]["place_status"]
+          updated_at?: string
+          user_id: string
+          visited_at?: string | null
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          is_favorite?: boolean
+          personal_notes?: string | null
+          personal_rating?: number | null
+          place_id?: string
+          planned_at?: string | null
+          status?: Database["public"]["Enums"]["place_status"]
+          updated_at?: string
+          user_id?: string
+          visited_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_places_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_places_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_places_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      geography_columns: {
+        Row: {
+          coord_dimension: number | null
+          f_geography_column: unknown
+          f_table_catalog: unknown
+          f_table_name: unknown
+          f_table_schema: unknown
+          srid: number | null
+          type: string | null
+        }
+        Relationships: []
+      }
+      geometry_columns: {
+        Row: {
+          coord_dimension: number | null
+          f_geometry_column: unknown
+          f_table_catalog: string | null
+          f_table_name: unknown
+          f_table_schema: unknown
+          srid: number | null
+          type: string | null
+        }
+        Insert: {
+          coord_dimension?: number | null
+          f_geometry_column?: unknown
+          f_table_catalog?: string | null
+          f_table_name?: unknown
+          f_table_schema?: unknown
+          srid?: number | null
+          type?: string | null
+        }
+        Update: {
+          coord_dimension?: number | null
+          f_geometry_column?: unknown
+          f_table_catalog?: string | null
+          f_table_name?: unknown
+          f_table_schema?: unknown
+          srid?: number | null
+          type?: string | null
+        }
+        Relationships: []
+      }
+      places_with_rating: {
+        Row: {
+          address_text: string | null
+          aggregate_rating: number | null
+          category_id: string | null
+          city: string | null
+          cover_photo_url: string | null
+          created_at: string | null
+          created_by_user_id: string | null
+          geog: unknown
+          id: string | null
+          latitude: number | null
+          longitude: number | null
+          name: string | null
+          review_count: number | null
+          updated_at: string | null
+          visibility: Database["public"]["Enums"]["place_visibility"] | null
+          wilaya: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "places_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "places_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Functions: {
+      _postgis_deprecate: {
+        Args: { newname: string; oldname: string; version: string }
+        Returns: undefined
+      }
+      _postgis_index_extent: {
+        Args: { col: string; tbl: unknown }
+        Returns: unknown
+      }
+      _postgis_pgsql_version: { Args: never; Returns: string }
+      _postgis_scripts_pgsql_version: { Args: never; Returns: string }
+      _postgis_selectivity: {
+        Args: { att_name: string; geom: unknown; mode?: string; tbl: unknown }
+        Returns: number
+      }
+      _postgis_stats: {
+        Args: { ""?: string; att_name: string; tbl: unknown }
+        Returns: string
+      }
+      _st_3dintersects: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      _st_contains: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      _st_containsproperly: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      _st_coveredby:
+        | { Args: { geog1: unknown; geog2: unknown }; Returns: boolean }
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      _st_covers:
+        | { Args: { geog1: unknown; geog2: unknown }; Returns: boolean }
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      _st_crosses: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      _st_dwithin: {
+        Args: {
+          geog1: unknown
+          geog2: unknown
+          tolerance: number
+          use_spheroid?: boolean
+        }
+        Returns: boolean
+      }
+      _st_equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      _st_intersects: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      _st_linecrossingdirection: {
+        Args: { line1: unknown; line2: unknown }
+        Returns: number
+      }
+      _st_longestline: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      _st_maxdistance: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      _st_orderingequals: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      _st_overlaps: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      _st_sortablehash: { Args: { geom: unknown }; Returns: number }
+      _st_touches: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      _st_voronoi: {
+        Args: {
+          clip?: unknown
+          g1: unknown
+          return_polygons?: boolean
+          tolerance?: number
+        }
+        Returns: unknown
+      }
+      _st_within: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      addauth: { Args: { "": string }; Returns: boolean }
+      addgeometrycolumn:
+        | {
+            Args: {
+              catalog_name: string
+              column_name: string
+              new_dim: number
+              new_srid_in: number
+              new_type: string
+              schema_name: string
+              table_name: string
+              use_typmod?: boolean
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: string
+              new_dim: number
+              new_srid: number
+              new_type: string
+              schema_name: string
+              table_name: string
+              use_typmod?: boolean
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: string
+              new_dim: number
+              new_srid: number
+              new_type: string
+              table_name: string
+              use_typmod?: boolean
+            }
+            Returns: string
+          }
+      disablelongtransactions: { Args: never; Returns: string }
+      dropgeometrycolumn:
+        | {
+            Args: {
+              catalog_name: string
+              column_name: string
+              schema_name: string
+              table_name: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: string
+              schema_name: string
+              table_name: string
+            }
+            Returns: string
+          }
+        | { Args: { column_name: string; table_name: string }; Returns: string }
+      dropgeometrytable:
+        | {
+            Args: {
+              catalog_name: string
+              schema_name: string
+              table_name: string
+            }
+            Returns: string
+          }
+        | { Args: { schema_name: string; table_name: string }; Returns: string }
+        | { Args: { table_name: string }; Returns: string }
+      enablelongtransactions: { Args: never; Returns: string }
+      equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      geometry: { Args: { "": string }; Returns: unknown }
+      geometry_above: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_below: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_cmp: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      geometry_contained_3d: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_contains: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_contains_3d: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_distance_box: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      geometry_distance_centroid: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      geometry_eq: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_ge: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_gt: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_le: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_left: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_lt: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_overabove: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_overbelow: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_overlaps: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_overlaps_3d: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_overleft: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_overright: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_right: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_same: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_same_3d: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geometry_within: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      geomfromewkt: { Args: { "": string }; Returns: unknown }
+      gettransactionid: { Args: never; Returns: unknown }
+      longtransactionsenabled: { Args: never; Returns: boolean }
+      nearby_places: {
+        Args: { lat: number; long: number; radius_meters?: number }
+        Returns: {
+          address_text: string | null
+          aggregate_rating: number | null
+          category_id: string | null
+          city: string | null
+          cover_photo_url: string | null
+          created_at: string | null
+          created_by_user_id: string | null
+          geog: unknown
+          id: string | null
+          latitude: number | null
+          longitude: number | null
+          name: string | null
+          review_count: number | null
+          updated_at: string | null
+          visibility: Database["public"]["Enums"]["place_visibility"] | null
+          wilaya: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "places_with_rating"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      populate_geometry_columns:
+        | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
+        | { Args: { use_typmod?: boolean }; Returns: string }
+      postgis_constraint_dims: {
+        Args: { geomcolumn: string; geomschema: string; geomtable: string }
+        Returns: number
+      }
+      postgis_constraint_srid: {
+        Args: { geomcolumn: string; geomschema: string; geomtable: string }
+        Returns: number
+      }
+      postgis_constraint_type: {
+        Args: { geomcolumn: string; geomschema: string; geomtable: string }
+        Returns: string
+      }
+      postgis_extensions_upgrade: { Args: never; Returns: string }
+      postgis_full_version: { Args: never; Returns: string }
+      postgis_geos_version: { Args: never; Returns: string }
+      postgis_lib_build_date: { Args: never; Returns: string }
+      postgis_lib_revision: { Args: never; Returns: string }
+      postgis_lib_version: { Args: never; Returns: string }
+      postgis_libjson_version: { Args: never; Returns: string }
+      postgis_liblwgeom_version: { Args: never; Returns: string }
+      postgis_libprotobuf_version: { Args: never; Returns: string }
+      postgis_libxml_version: { Args: never; Returns: string }
+      postgis_proj_version: { Args: never; Returns: string }
+      postgis_scripts_build_date: { Args: never; Returns: string }
+      postgis_scripts_installed: { Args: never; Returns: string }
+      postgis_scripts_released: { Args: never; Returns: string }
+      postgis_svn_version: { Args: never; Returns: string }
+      postgis_type_name: {
+        Args: {
+          coord_dimension: number
+          geomname: string
+          use_new_name?: boolean
+        }
+        Returns: string
+      }
+      postgis_version: { Args: never; Returns: string }
+      postgis_wagyu_version: { Args: never; Returns: string }
+      st_3dclosestpoint: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_3ddistance: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      st_3dintersects: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      st_3dlongestline: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_3dmakebox: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_3dmaxdistance: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      st_3dshortestline: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_addpoint: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_angle:
+        | { Args: { line1: unknown; line2: unknown }; Returns: number }
+        | {
+            Args: { pt1: unknown; pt2: unknown; pt3: unknown; pt4?: unknown }
+            Returns: number
+          }
+      st_area:
+        | { Args: { geog: unknown; use_spheroid?: boolean }; Returns: number }
+        | { Args: { "": string }; Returns: number }
+      st_asencodedpolyline: {
+        Args: { geom: unknown; nprecision?: number }
+        Returns: string
+      }
+      st_asewkt: { Args: { "": string }; Returns: string }
+      st_asgeojson:
+        | {
+            Args: { geog: unknown; maxdecimaldigits?: number; options?: number }
+            Returns: string
+          }
+        | {
+            Args: { geom: unknown; maxdecimaldigits?: number; options?: number }
+            Returns: string
+          }
+        | {
+            Args: {
+              geom_column?: string
+              maxdecimaldigits?: number
+              pretty_bool?: boolean
+              r: Record<string, unknown>
+            }
+            Returns: string
+          }
+        | { Args: { "": string }; Returns: string }
+      st_asgml:
+        | {
+            Args: {
+              geog: unknown
+              id?: string
+              maxdecimaldigits?: number
+              nprefix?: string
+              options?: number
+            }
+            Returns: string
+          }
+        | {
+            Args: { geom: unknown; maxdecimaldigits?: number; options?: number }
+            Returns: string
+          }
+        | { Args: { "": string }; Returns: string }
+        | {
+            Args: {
+              geog: unknown
+              id?: string
+              maxdecimaldigits?: number
+              nprefix?: string
+              options?: number
+              version: number
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              geom: unknown
+              id?: string
+              maxdecimaldigits?: number
+              nprefix?: string
+              options?: number
+              version: number
+            }
+            Returns: string
+          }
+      st_askml:
+        | {
+            Args: { geog: unknown; maxdecimaldigits?: number; nprefix?: string }
+            Returns: string
+          }
+        | {
+            Args: { geom: unknown; maxdecimaldigits?: number; nprefix?: string }
+            Returns: string
+          }
+        | { Args: { "": string }; Returns: string }
+      st_aslatlontext: {
+        Args: { geom: unknown; tmpl?: string }
+        Returns: string
+      }
+      st_asmarc21: { Args: { format?: string; geom: unknown }; Returns: string }
+      st_asmvtgeom: {
+        Args: {
+          bounds: unknown
+          buffer?: number
+          clip_geom?: boolean
+          extent?: number
+          geom: unknown
+        }
+        Returns: unknown
+      }
+      st_assvg:
+        | {
+            Args: { geog: unknown; maxdecimaldigits?: number; rel?: number }
+            Returns: string
+          }
+        | {
+            Args: { geom: unknown; maxdecimaldigits?: number; rel?: number }
+            Returns: string
+          }
+        | { Args: { "": string }; Returns: string }
+      st_astext: { Args: { "": string }; Returns: string }
+      st_astwkb:
+        | {
+            Args: {
+              geom: unknown
+              prec?: number
+              prec_m?: number
+              prec_z?: number
+              with_boxes?: boolean
+              with_sizes?: boolean
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              geom: unknown[]
+              ids: number[]
+              prec?: number
+              prec_m?: number
+              prec_z?: number
+              with_boxes?: boolean
+              with_sizes?: boolean
+            }
+            Returns: string
+          }
+      st_asx3d: {
+        Args: { geom: unknown; maxdecimaldigits?: number; options?: number }
+        Returns: string
+      }
+      st_azimuth:
+        | { Args: { geog1: unknown; geog2: unknown }; Returns: number }
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: number }
+      st_boundingdiagonal: {
+        Args: { fits?: boolean; geom: unknown }
+        Returns: unknown
+      }
+      st_buffer:
+        | {
+            Args: { geom: unknown; options?: string; radius: number }
+            Returns: unknown
+          }
+        | {
+            Args: { geom: unknown; quadsegs: number; radius: number }
+            Returns: unknown
+          }
+      st_centroid: { Args: { "": string }; Returns: unknown }
+      st_clipbybox2d: {
+        Args: { box: unknown; geom: unknown }
+        Returns: unknown
+      }
+      st_closestpoint: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_collect: { Args: { geom1: unknown; geom2: unknown }; Returns: unknown }
+      st_concavehull: {
+        Args: {
+          param_allow_holes?: boolean
+          param_geom: unknown
+          param_pctconvex: number
+        }
+        Returns: unknown
+      }
+      st_contains: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      st_containsproperly: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      st_coorddim: { Args: { geometry: unknown }; Returns: number }
+      st_coveredby:
+        | { Args: { geog1: unknown; geog2: unknown }; Returns: boolean }
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      st_covers:
+        | { Args: { geog1: unknown; geog2: unknown }; Returns: boolean }
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      st_crosses: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      st_curvetoline: {
+        Args: { flags?: number; geom: unknown; tol?: number; toltype?: number }
+        Returns: unknown
+      }
+      st_delaunaytriangles: {
+        Args: { flags?: number; g1: unknown; tolerance?: number }
+        Returns: unknown
+      }
+      st_difference: {
+        Args: { geom1: unknown; geom2: unknown; gridsize?: number }
+        Returns: unknown
+      }
+      st_disjoint: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      st_distance:
+        | {
+            Args: { geog1: unknown; geog2: unknown; use_spheroid?: boolean }
+            Returns: number
+          }
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: number }
+      st_distancesphere:
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: number }
+        | {
+            Args: { geom1: unknown; geom2: unknown; radius: number }
+            Returns: number
+          }
+      st_distancespheroid: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      st_dwithin: {
+        Args: {
+          geog1: unknown
+          geog2: unknown
+          tolerance: number
+          use_spheroid?: boolean
+        }
+        Returns: boolean
+      }
+      st_equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      st_expand:
+        | { Args: { box: unknown; dx: number; dy: number }; Returns: unknown }
+        | {
+            Args: { box: unknown; dx: number; dy: number; dz?: number }
+            Returns: unknown
+          }
+        | {
+            Args: {
+              dm?: number
+              dx: number
+              dy: number
+              dz?: number
+              geom: unknown
+            }
+            Returns: unknown
+          }
+      st_force3d: { Args: { geom: unknown; zvalue?: number }; Returns: unknown }
+      st_force3dm: {
+        Args: { geom: unknown; mvalue?: number }
+        Returns: unknown
+      }
+      st_force3dz: {
+        Args: { geom: unknown; zvalue?: number }
+        Returns: unknown
+      }
+      st_force4d: {
+        Args: { geom: unknown; mvalue?: number; zvalue?: number }
+        Returns: unknown
+      }
+      st_generatepoints:
+        | { Args: { area: unknown; npoints: number }; Returns: unknown }
+        | {
+            Args: { area: unknown; npoints: number; seed: number }
+            Returns: unknown
+          }
+      st_geogfromtext: { Args: { "": string }; Returns: unknown }
+      st_geographyfromtext: { Args: { "": string }; Returns: unknown }
+      st_geohash:
+        | { Args: { geog: unknown; maxchars?: number }; Returns: string }
+        | { Args: { geom: unknown; maxchars?: number }; Returns: string }
+      st_geomcollfromtext: { Args: { "": string }; Returns: unknown }
+      st_geometricmedian: {
+        Args: {
+          fail_if_not_converged?: boolean
+          g: unknown
+          max_iter?: number
+          tolerance?: number
+        }
+        Returns: unknown
+      }
+      st_geometryfromtext: { Args: { "": string }; Returns: unknown }
+      st_geomfromewkt: { Args: { "": string }; Returns: unknown }
+      st_geomfromgeojson:
+        | { Args: { "": Json }; Returns: unknown }
+        | { Args: { "": Json }; Returns: unknown }
+        | { Args: { "": string }; Returns: unknown }
+      st_geomfromgml: { Args: { "": string }; Returns: unknown }
+      st_geomfromkml: { Args: { "": string }; Returns: unknown }
+      st_geomfrommarc21: { Args: { marc21xml: string }; Returns: unknown }
+      st_geomfromtext: { Args: { "": string }; Returns: unknown }
+      st_gmltosql: { Args: { "": string }; Returns: unknown }
+      st_hasarc: { Args: { geometry: unknown }; Returns: boolean }
+      st_hausdorffdistance: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      st_hexagon: {
+        Args: { cell_i: number; cell_j: number; origin?: unknown; size: number }
+        Returns: unknown
+      }
+      st_hexagongrid: {
+        Args: { bounds: unknown; size: number }
+        Returns: Record<string, unknown>[]
+      }
+      st_interpolatepoint: {
+        Args: { line: unknown; point: unknown }
+        Returns: number
+      }
+      st_intersection: {
+        Args: { geom1: unknown; geom2: unknown; gridsize?: number }
+        Returns: unknown
+      }
+      st_intersects:
+        | { Args: { geog1: unknown; geog2: unknown }; Returns: boolean }
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      st_isvaliddetail: {
+        Args: { flags?: number; geom: unknown }
+        Returns: Database["public"]["CompositeTypes"]["valid_detail"]
+        SetofOptions: {
+          from: "*"
+          to: "valid_detail"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      st_length:
+        | { Args: { geog: unknown; use_spheroid?: boolean }; Returns: number }
+        | { Args: { "": string }; Returns: number }
+      st_letters: { Args: { font?: Json; letters: string }; Returns: unknown }
+      st_linecrossingdirection: {
+        Args: { line1: unknown; line2: unknown }
+        Returns: number
+      }
+      st_linefromencodedpolyline: {
+        Args: { nprecision?: number; txtin: string }
+        Returns: unknown
+      }
+      st_linefromtext: { Args: { "": string }; Returns: unknown }
+      st_linelocatepoint: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      st_linetocurve: { Args: { geometry: unknown }; Returns: unknown }
+      st_locatealong: {
+        Args: { geometry: unknown; leftrightoffset?: number; measure: number }
+        Returns: unknown
+      }
+      st_locatebetween: {
+        Args: {
+          frommeasure: number
+          geometry: unknown
+          leftrightoffset?: number
+          tomeasure: number
+        }
+        Returns: unknown
+      }
+      st_locatebetweenelevations: {
+        Args: { fromelevation: number; geometry: unknown; toelevation: number }
+        Returns: unknown
+      }
+      st_longestline: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_makebox2d: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_makeline: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_makevalid: {
+        Args: { geom: unknown; params: string }
+        Returns: unknown
+      }
+      st_maxdistance: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: number
+      }
+      st_minimumboundingcircle: {
+        Args: { inputgeom: unknown; segs_per_quarter?: number }
+        Returns: unknown
+      }
+      st_mlinefromtext: { Args: { "": string }; Returns: unknown }
+      st_mpointfromtext: { Args: { "": string }; Returns: unknown }
+      st_mpolyfromtext: { Args: { "": string }; Returns: unknown }
+      st_multilinestringfromtext: { Args: { "": string }; Returns: unknown }
+      st_multipointfromtext: { Args: { "": string }; Returns: unknown }
+      st_multipolygonfromtext: { Args: { "": string }; Returns: unknown }
+      st_node: { Args: { g: unknown }; Returns: unknown }
+      st_normalize: { Args: { geom: unknown }; Returns: unknown }
+      st_offsetcurve: {
+        Args: { distance: number; line: unknown; params?: string }
+        Returns: unknown
+      }
+      st_orderingequals: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      st_overlaps: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: boolean
+      }
+      st_perimeter: {
+        Args: { geog: unknown; use_spheroid?: boolean }
+        Returns: number
+      }
+      st_pointfromtext: { Args: { "": string }; Returns: unknown }
+      st_pointm: {
+        Args: {
+          mcoordinate: number
+          srid?: number
+          xcoordinate: number
+          ycoordinate: number
+        }
+        Returns: unknown
+      }
+      st_pointz: {
+        Args: {
+          srid?: number
+          xcoordinate: number
+          ycoordinate: number
+          zcoordinate: number
+        }
+        Returns: unknown
+      }
+      st_pointzm: {
+        Args: {
+          mcoordinate: number
+          srid?: number
+          xcoordinate: number
+          ycoordinate: number
+          zcoordinate: number
+        }
+        Returns: unknown
+      }
+      st_polyfromtext: { Args: { "": string }; Returns: unknown }
+      st_polygonfromtext: { Args: { "": string }; Returns: unknown }
+      st_project: {
+        Args: { azimuth: number; distance: number; geog: unknown }
+        Returns: unknown
+      }
+      st_quantizecoordinates: {
+        Args: {
+          g: unknown
+          prec_m?: number
+          prec_x: number
+          prec_y?: number
+          prec_z?: number
+        }
+        Returns: unknown
+      }
+      st_reduceprecision: {
+        Args: { geom: unknown; gridsize: number }
+        Returns: unknown
+      }
+      st_relate: { Args: { geom1: unknown; geom2: unknown }; Returns: string }
+      st_removerepeatedpoints: {
+        Args: { geom: unknown; tolerance?: number }
+        Returns: unknown
+      }
+      st_segmentize: {
+        Args: { geog: unknown; max_segment_length: number }
+        Returns: unknown
+      }
+      st_setsrid:
+        | { Args: { geog: unknown; srid: number }; Returns: unknown }
+        | { Args: { geom: unknown; srid: number }; Returns: unknown }
+      st_sharedpaths: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_shortestline: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_simplifypolygonhull: {
+        Args: { geom: unknown; is_outer?: boolean; vertex_fraction: number }
+        Returns: unknown
+      }
+      st_split: { Args: { geom1: unknown; geom2: unknown }; Returns: unknown }
+      st_square: {
+        Args: { cell_i: number; cell_j: number; origin?: unknown; size: number }
+        Returns: unknown
+      }
+      st_squaregrid: {
+        Args: { bounds: unknown; size: number }
+        Returns: Record<string, unknown>[]
+      }
+      st_srid:
+        | { Args: { geog: unknown }; Returns: number }
+        | { Args: { geom: unknown }; Returns: number }
+      st_subdivide: {
+        Args: { geom: unknown; gridsize?: number; maxvertices?: number }
+        Returns: unknown[]
+      }
+      st_swapordinates: {
+        Args: { geom: unknown; ords: unknown }
+        Returns: unknown
+      }
+      st_symdifference: {
+        Args: { geom1: unknown; geom2: unknown; gridsize?: number }
+        Returns: unknown
+      }
+      st_symmetricdifference: {
+        Args: { geom1: unknown; geom2: unknown }
+        Returns: unknown
+      }
+      st_tileenvelope: {
+        Args: {
+          bounds?: unknown
+          margin?: number
+          x: number
+          y: number
+          zoom: number
+        }
+        Returns: unknown
+      }
+      st_touches: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      st_transform:
+        | {
+            Args: { from_proj: string; geom: unknown; to_proj: string }
+            Returns: unknown
+          }
+        | {
+            Args: { from_proj: string; geom: unknown; to_srid: number }
+            Returns: unknown
+          }
+        | { Args: { geom: unknown; to_proj: string }; Returns: unknown }
+      st_triangulatepolygon: { Args: { g1: unknown }; Returns: unknown }
+      st_union:
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: unknown }
+        | {
+            Args: { geom1: unknown; geom2: unknown; gridsize: number }
+            Returns: unknown
+          }
+      st_voronoilines: {
+        Args: { extend_to?: unknown; g1: unknown; tolerance?: number }
+        Returns: unknown
+      }
+      st_voronoipolygons: {
+        Args: { extend_to?: unknown; g1: unknown; tolerance?: number }
+        Returns: unknown
+      }
+      st_within: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      st_wkbtosql: { Args: { wkb: string }; Returns: unknown }
+      st_wkttosql: { Args: { "": string }; Returns: unknown }
+      st_wrapx: {
+        Args: { geom: unknown; move: number; wrap: number }
+        Returns: unknown
+      }
+      unlockrows: { Args: { "": string }; Returns: number }
+      updategeometrysrid: {
+        Args: {
+          catalogn_name: string
+          column_name: string
+          new_srid_in: number
+          schema_name: string
+          table_name: string
+        }
+        Returns: string
+      }
+    }
+    Enums: {
+      app_language: "ar" | "fr"
+      notification_type: "reminder" | "system" | "social"
+      place_status: "a_faire" | "visite"
+      place_visibility: "private" | "public"
+    }
+    CompositeTypes: {
+      geometry_dump: {
+        path: number[] | null
+        geom: unknown
+      }
+      valid_detail: {
+        valid: boolean | null
+        reason: string | null
+        location: unknown
+      }
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_language: ["ar", "fr"],
+      notification_type: ["reminder", "system", "social"],
+      place_status: ["a_faire", "visite"],
+      place_visibility: ["private", "public"],
+    },
+  },
+} as const
+</file>
+
+<file path="supabase/supabase.ts">
+import 'react-native-url-polyfill/auto';
+import 'react-native-get-random-values';
+import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import * as aesjs from 'aes-js';
+import type { Database } from '@/supabase/database';
+
+class LargeSecureStore {
+  private async _encrypt(key: string, value: string) {
+    const encryptionKey = crypto.getRandomValues(new Uint8Array(256 / 8));
+    const cipher = new aesjs.ModeOfOperation.ctr(encryptionKey, new aesjs.Counter(1));
+    const encryptedBytes = cipher.encrypt(aesjs.utils.utf8.toBytes(value));
+    await SecureStore.setItemAsync(key, aesjs.utils.hex.fromBytes(encryptionKey));
+    return aesjs.utils.hex.fromBytes(encryptedBytes);
+  }
+
+  private async _decrypt(key: string, value: string) {
+    const encryptionKeyHex = await SecureStore.getItemAsync(key);
+    if (!encryptionKeyHex) return encryptionKeyHex;
+    const cipher = new aesjs.ModeOfOperation.ctr(
+      aesjs.utils.hex.toBytes(encryptionKeyHex),
+      new aesjs.Counter(1)
+    );
+    const decryptedBytes = cipher.decrypt(aesjs.utils.hex.toBytes(value));
+    return aesjs.utils.utf8.fromBytes(decryptedBytes);
+  }
+
+  async getItem(key: string) {
+    const encrypted = await AsyncStorage.getItem(key);
+    if (!encrypted) return encrypted;
+    return await this._decrypt(key, encrypted);
+  }
+
+  async removeItem(key: string) {
+    await AsyncStorage.removeItem(key);
+    await SecureStore.deleteItemAsync(key);
+  }
+
+  async setItem(key: string, value: string) {
+    const encrypted = await this._encrypt(key, value);
+    await AsyncStorage.setItem(key, encrypted);
+  }
+}
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: new LargeSecureStore(),
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
+</file>
+
+<file path=".env.example">
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_KEY=
+</file>
+
 <file path=".gitignore">
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
@@ -1082,88 +4591,6 @@ app-example
 /android
 </file>
 
-<file path="app.json">
-{
-  "expo": {
-    "name": "win-nroh",
-    "slug": "win-nroh",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "winnroh",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png",
-      "bundler": "metro"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ],
-      "expo-localization"
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
-  }
-}
-</file>
-
-<file path="app/modal.tsx">
-import { Link } from 'expo-router';
-import { StyleSheet, View, Text } from 'react-native';
-
-export default function ModalScreen() {
-  return (
-    <View style={styles.container}>
-      <Text>This is a modal</Text>
-      <Link href="/" dismissTo style={styles.link}>
-        <Text>Go to home screen</Text>
-      </Link>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
-});
-</file>
-
 <file path="babel.config.js">
 module.exports = function (api) {
   api.cache(true);
@@ -1180,66 +4607,287 @@ module.exports = function (api) {
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Base */
+    --background: 40 50% 97.6%;
+    --foreground: 190 34.3% 13.7%;
+
+    /* Surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 190 34.3% 13.7%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 190 34.3% 13.7%;
+
+    /* Brand */
+    --primary: 185.9 89.2% 29%;
+    --primary-foreground: 0 0% 100%;
+
+    --primary-dark: 185.9 91.1% 22%;
+    --primary-light: 177.3 47.8% 91%;
+
+    /* Secondary */
+    --secondary: 189 8.9% 43.9%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Muted */
+    --muted: 160 12% 95.1%;
+    --muted-foreground: 189 8.9% 43.9%;
+
+    /* Accent */
+    --accent: 26.5 87% 66.9%;
+    --accent-light: 27.9 100% 94.5%;
+    --accent-foreground: 190 34.3% 13.7%;
+
+    /* Status */
+    --success: 103.8 28.8% 42.9%;
+    --success-foreground: 0 0% 100%;
+
+    --destructive: 1.9 62.7% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders / Inputs */
+    --border: 168 10.2% 90.4%;
+    --input: 168 10.2% 90.4%;
+    --ring: 185.9 89.2% 29%;
+
+    /* Radius */
+    --radius: 0.75rem;
+
+    /* Charts */
+    --chart-1: 185.9 89.2% 29%;
+    --chart-2: 26.5 87% 66.9%;
+    --chart-3: 103.8 28.8% 42.9%;
+    --chart-4: 177.3 47.8% 91%;
+    --chart-5: 1.9 62.7% 60%;
+  }
+
+  .dark:root {
+    /* Base */
+    --background: 190 27.3% 8.6%;
+    --foreground: 160 14.3% 95.9%;
+
+    /* Surfaces */
+    --card: 188 24.6% 12%;
+    --card-foreground: 160 14.3% 95.9%;
+    --popover: 188 24.6% 12%;
+    --popover-foreground: 160 14.3% 95.9%;
+
+    /* Brand */
+    --primary: 183.2 60.2% 42.4%;
+    --primary-foreground: 0 0% 100%;
+
+    --primary-dark: 183.5 65.8% 31%;
+    --primary-light: 185.2 56.1% 16.1%;
+
+    /* Secondary */
+    --secondary: 183.5 9.6% 65.3%;
+    --secondary-foreground: 190 27.3% 8.6%;
+
+    /* Muted */
+    --muted: 189.5 22.9% 16.3%;
+    --muted-foreground: 183.5 9.6% 65.3%;
+
+    /* Accent */
+    --accent: 26.5 87% 66.9%;
+    --accent-light: 23.1 28.9% 17.6%;
+    --accent-foreground: 190 27.3% 8.6%;
+
+    /* Status */
+    --success: 103.6 27.5% 52.9%;
+    --success-foreground: 0 0% 100%;
+
+    --destructive: 2 72.1% 67.6%;
+    --destructive-foreground: 190 27.3% 8.6%;
+
+    /* Borders / Inputs */
+    --border: 186.7 17.3% 20.4%;
+    --input: 186.7 17.3% 20.4%;
+    --ring: 183.2 60.2% 42.4%;
+
+    /* Charts */
+    --chart-1: 183.2 60.2% 42.4%;
+    --chart-2: 26.5 87% 66.9%;
+    --chart-3: 103.6 27.5% 52.9%;
+    --chart-4: 177.3 47.8% 91%;
+    --chart-5: 2 72.1% 67.6%;
+  }
+}
 </file>
 
 <file path="metro.config.js">
-const { getDefaultConfig } = require("expo/metro-config");
+const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
- 
-const config = getDefaultConfig(__dirname)
- 
-module.exports = withNativeWind(config, { input: './global.css' })
+
+const config = getDefaultConfig(__dirname);
+
+module.exports = withNativeWind(config, {
+  input: './global.css',
+  inlineRem: 16,
+});
 </file>
 
 <file path="nativewind-env.d.ts">
 /// <reference types="nativewind/types" />
 </file>
 
+<file path="stores/example-store.ts">
+import { create } from 'zustand';
+
+interface ExampleState {
+  count: number;
+  increment: () => void;
+  reset: () => void;
+}
+
+export const useExampleStore = create<ExampleState>((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  reset: () => set({ count: 0 }),
+}));
+
+
+// interface ExampleState {
+//   value: string;
+//   isLoading: boolean;   // ne doit jamais persister
+//   setValue: (v: string) => void;
+// }
+
+// export const useExamplePersistedStore = create<ExampleState>()(
+//   persist(
+//     (set) => ({
+//       value: '',
+//       isLoading: false,
+//       setValue: (v) => set({ value: v }),
+//     }),
+//     {
+//       name: 'example-persisted-store',
+//       storage: createJSONStorage(() => AsyncStorage),
+//       partialize: (state) => ({ value: state.value }),  // ne persiste QUE `value`
+//     }
+//   )
+// );
+</file>
+
 <file path="tailwind.config.js">
+const { hairlineWidth } = require('nativewind/theme');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}'],
+  darkMode: 'class',
+
+  content: [
+    './app/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+  ],
+
   presets: [require('nativewind/preset')],
+
   theme: {
     extend: {
+      fontFamily: {
+        tajawal: ['Tajawal_400Regular'],
+        'tajawal-medium': ['Tajawal_500Medium'],
+        'tajawal-bold': ['Tajawal_700Bold'],
+        'tajawal-extra-bold': ['Tajawal_800ExtraBold'],
+      },
       colors: {
-        background: 'var(--color-background)',
-        foreground: 'var(--color-foreground)',
+        // Base
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+
+        // Surfaces
         card: {
-          DEFAULT: 'var(--color-card)',
-          foreground: 'var(--color-card-foreground)',
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
         },
+
         popover: {
-          DEFAULT: 'var(--color-popover)',
-          foreground: 'var(--color-popover-foreground)',
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
         },
+
+        // Brand
         primary: {
-          DEFAULT: 'var(--color-primary)',
-          foreground: 'var(--color-primary-foreground)',
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
+          dark: 'hsl(var(--primary-dark))',
+          light: 'hsl(var(--primary-light))',
         },
+
+        // Secondary
         secondary: {
-          DEFAULT: 'var(--color-secondary)',
-          foreground: 'var(--color-secondary-foreground)',
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
         },
+
+        // Muted
         muted: {
-          DEFAULT: 'var(--color-muted)',
-          foreground: 'var(--color-muted-foreground)',
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
         },
+
+        // Accent
         accent: {
-          DEFAULT: 'var(--color-accent)',
-          foreground: 'var(--color-accent-foreground)',
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+          light: 'hsl(var(--accent-light))',
         },
+
+        // Status
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
+        },
+
         destructive: {
-          DEFAULT: 'var(--color-destructive)',
-          foreground: 'var(--color-destructive-foreground)',
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
         },
-        border: 'var(--color-border)',
-        input: 'var(--color-input)',
-        ring: 'var(--color-ring)',
+
+        // Borders / Inputs
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+      },
+
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
+
+      borderWidth: {
+        hairline: hairlineWidth(),
+      },
+
+      keyframes: {
+        'accordion-down': {
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
+        },
+
+        'accordion-up': {
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
+      },
+
+      animation: {
+        'accordion-down': 'accordion-down 0.2s ease-out',
+        'accordion-up': 'accordion-up 0.2s ease-out',
       },
     },
   },
-  plugins: [],
+
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
+
+  plugins: [
+    require('tailwindcss-animate'),
+  ],
 };
 </file>
 
@@ -1264,176 +4912,65 @@ module.exports = {
 }
 </file>
 
-<file path="app/_layout.tsx">
-import '../global.css';
-import '../i18n/index';
-import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-import { ThemeProvider, useTheme } from '@/providers/theme-provider';
-import { themes } from '@/constants/theme';
-import { View } from 'react-native';
-
-
-function RootLayoutNav() {
-  const { isDark } = useTheme();
-
-  return (
-    <View style={themes[isDark ? 'dark' : 'light']} className="flex-1">
-      <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-      </NavigationThemeProvider>
-    </View>
-  );
-}
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
-export default function RootLayout() {
-  return (
-    <ThemeProvider>
-      <RootLayoutNav />
-    </ThemeProvider>
-  );
-}
-</file>
-
-<file path="constants/theme.ts">
-import { vars } from 'nativewind';
-
-export const themes = {
-  light: vars({
-    '--color-background': '#FFFFFF',
-    '--color-foreground': '#111827',
-    '--color-card': '#FFFFFF',
-    '--color-card-foreground': '#111827',
-    '--color-popover': '#FFFFFF',
-    '--color-popover-foreground': '#111827',
-    '--color-primary': '#0A7EA4',
-    '--color-primary-foreground': '#FFFFFF',
-    '--color-secondary': '#6B7280',
-    '--color-secondary-foreground': '#FFFFFF',
-    '--color-muted': '#F3F4F6',
-    '--color-muted-foreground': '#6B7280',
-    '--color-accent': '#F3F4F6',
-    '--color-accent-foreground': '#111827',
-    '--color-destructive': '#EF4444',
-    '--color-destructive-foreground': '#FFFFFF',
-    '--color-border': '#E5E7EB',
-    '--color-input': '#E5E7EB',
-    '--color-ring': '#0A7EA4',
-  }),
-  dark: vars({
-    '--color-background': '#111827',
-    '--color-foreground': '#F9FAFB',
-    '--color-card': '#1F2937',
-    '--color-card-foreground': '#F9FAFB',
-    '--color-popover': '#1F2937',
-    '--color-popover-foreground': '#F9FAFB',
-    '--color-primary': '#3B82F6',
-    '--color-primary-foreground': '#FFFFFF',
-    '--color-secondary': '#9CA3AF',
-    '--color-secondary-foreground': '#111827',
-    '--color-muted': '#374151',
-    '--color-muted-foreground': '#9CA3AF',
-    '--color-accent': '#374151',
-    '--color-accent-foreground': '#F9FAFB',
-    '--color-destructive': '#F87171',
-    '--color-destructive-foreground': '#111827',
-    '--color-border': '#374151',
-    '--color-input': '#374151',
-    '--color-ring': '#3B82F6',
-  }),
-};
-</file>
-
-<file path="docs/DECISIONS.md">
-# Decisions
-
-| Concern | Choice | Why |
-|---|---|---|
-| Framework | Expo (managed, EAS Build) | OTA updates, cloud builds, no native config until we need a custom native module |
-| Styling | NativeWind v4 stable + Tailwind v3 | Stable, unchanging token contract |
-| UI primitives | react-native-reusables | Matches NativeWind, we own the component code |
-| Navigation | Expo Router | File-based, typed routes, deep linking |
-| Server state | TanStack Query | No hand-rolled loading/error/cache state |
-| Client state | Zustand | Minimal boilerplate, works with persistence middleware |
-| Persistence | AsyncStorage (hot-path state) / SecureStore (tokens/secrets) | AsyncStorage easier to test with Expo, no prebuild needed |
-| Forms | react-hook-form + zod | Type-safe validation, minimal re-renders |
-| Backend | Supabase | Generate TS types from schema |
-| i18n | i18next + react-i18next + expo-localization | See Stage 2 for RTL |
-
-
-## Notes
-- SDK 54 template (as of Aug 2026) ships without the old demo files (explore/hello-wave/parallax/etc.) — Stage 0.2 cleanup step skipped, nothing to remove.
-- Windows + metro-config: `metro-config/src/loadConfig.js` uses a raw `import(absolutePath)` on Windows absolute paths, which Node's ESM loader rejects (`ERR_UNSUPPORTED_ESM_URL_SCHEME`). Patched via patch-package to wrap with `pathToFileURL()`. See patches/metro-config+0.83.3.patch. Do not remove.
-- Dark mode: CSS `.dark {}` selector approach (shadcn web pattern) is unreliable on native NativeWind (GitHub issue #702). Using `vars()` + wrapping View instead — see theme/tokens.ts.
-</file>
-
-<file path="package.json">
+<file path="app.json">
 {
-  "name": "win-nroh",
-  "main": "expo-router/entry",
-  "version": "1.0.0",
-  "scripts": {
-    "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "lint": "expo lint"
-  },
-  "dependencies": {
-    "@expo/vector-icons": "^15.0.3",
-    "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-navigation/bottom-tabs": "^7.4.0",
-    "@react-navigation/elements": "^2.6.3",
-    "@react-navigation/native": "^7.1.8",
-    "babel-preset-expo": "~54.0.10",
-    "expo": "~54.0.35",
-    "expo-constants": "~18.0.13",
-    "expo-font": "~14.0.12",
-    "expo-haptics": "~15.0.8",
-    "expo-image": "~3.0.11",
-    "expo-linking": "~8.0.12",
-    "expo-localization": "~17.0.9",
-    "expo-router": "~6.0.24",
-    "expo-splash-screen": "~31.0.13",
-    "expo-status-bar": "~3.0.9",
-    "expo-symbols": "~1.0.8",
-    "expo-system-ui": "~6.0.9",
-    "expo-updates": "~29.0.19",
-    "expo-web-browser": "~15.0.11",
-    "i18next": "^26.3.6",
-    "nativewind": "^4.2.6",
-    "prettier-plugin-tailwindcss": "^0.5.14",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "react-i18next": "^17.0.11",
-    "react-native": "0.81.5",
-    "react-native-gesture-handler": "~2.28.0",
-    "react-native-reanimated": "~4.1.1",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0",
-    "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.5.1",
-    "tailwindcss": "^3.4.19"
-  },
-  "devDependencies": {
-    "@types/react": "~19.1.0",
-    "eslint": "^9.25.0",
-    "eslint-config-expo": "~10.0.0",
-    "patch-package": "^8.0.1",
-    "typescript": "~5.9.2"
-  },
-  "private": true
+  "expo": {
+    "name": "win-nroh",
+    "slug": "win-nroh",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "winnroh",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "softwareKeyboardLayoutMode": "pan",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.meriembelaid.winnroh"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/logo.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-localization",
+      "expo-secure-store",
+      "expo-font",
+      "expo-dev-client",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "supportsRTL": true
+    }
+  }
 }
 </file>
 
@@ -1466,30 +5003,467 @@ export default function TabLayout() {
 }
 </file>
 
+<file path="docs/ROADMAP.md">
+# Roadmap — Configs réalisées
+
+## Stage 0 — Fondations & Tooling
+
+1. Décider la stack et la documenter dans `docs/DECISIONS.md` avant tout code.
+2. Initialiser le projet : `npx create-expo-app@latest . --template default@sdk-54` — https://docs.expo.dev/get-started/create-a-project/
+3. Nettoyer le code de démo du template (si présent) avec `git rm`.
+4. Vérifier `strict: true` dans `tsconfig.json` (activé par défaut Expo SDK 54) — https://www.typescriptlang.org/tsconfig#strict
+5. Vérifier ESLint via `eslint-config-expo/flat` (préconfiguré) — https://docs.expo.dev/guides/using-eslint/
+6. Vérifier icônes/splash + lancer `npx expo-doctor` — https://docs.expo.dev/develop/user-interface/splash-screen-and-app-icon/
+7. Créer `.env.example` (committé) et vérifier `.gitignore` pour les vrais `.env*` — https://docs.expo.dev/guides/environment-variables/
+
+## Stage 1 — Design System & Theming
+
+8. Installer NativeWind v4 + Tailwind v3 : `npx expo install nativewind tailwindcss@^3 react-native-reanimated react-native-safe-area-context` — https://www.nativewind.dev/docs/getting-started/installation
+9. Créer `babel.config.js` avec `jsxImportSource: 'nativewind'` + plugin Reanimated en dernier — https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started/
+10. Créer `metro.config.js` avec `withNativeWind(config, { input: './global.css' })` — https://www.nativewind.dev/docs/api/with-nativewind
+11. Créer `global.css` avec les 3 directives `@tailwind` (syntaxe v3, pas de bloc `@theme` qui est réservé à v4) — https://tailwindcss.com/docs/upgrade-guide (voir différences v3/v4)
+12. Créer `tailwind.config.js` avec `presets: [require('nativewind/preset')]` + `theme.extend.colors` mappés sur des `var(--color-x)` — https://www.nativewind.dev/docs/customization/colors
+13. Importer `global.css` dans `app/_layout.tsx`.
+14. Créer `providers/theme-provider.tsx` (Context + AsyncStorage) pour un choix persistant light/dark/system — https://docs.expo.dev/develop/user-interface/color-themes/
+15. Supprimer les doublons de source de vérité couleur (`constants/theme.ts`, `hooks/use-theme-color.ts`) — un seul vocabulaire de tokens.
+16. Pour une couleur native brute (ex. React Navigation tab bar), lire la même variable via `useUnstableNativeVariable` — https://www.nativewind.dev/docs/api/vars
+17. Retirer `darkMode: 'class'` de `tailwind.config.js` — casse le suivi système sur NativeWind natif.
+18. **Ne pas** utiliser le pattern CSS `.dark {}` (shadcn/web) pour les tokens dark — non fiable sur natif (bug connu) : https://github.com/nativewind/nativewind/issues/702
+19. Définir les tokens light/dark via `vars()` dans `theme/tokens.ts`, appliqués en `style` sur un `View` racine selon `isDark` — https://www.nativewind.dev/docs/guides/themes
+20. Créer `app/dev/theme-preview.tsx` (route Expo Router automatique) pour valider visuellement chaque primitive UI en light/dark + switch de mode.
+
+## Notes environnement (Windows-spécifique)
+
+21. Bug `ERR_UNSUPPORTED_ESM_URL_SCHEME` sous Windows : patcher `metro-config/src/loadConfig.js` avec `pathToFileURL()`, figé via `patch-package` — https://github.com/sindresorhus/patch-package
+22. Bug `Cannot find module 'babel-preset-expo'` (hoisting npm) : le déclarer en dépendance directe via `npx expo install babel-preset-expo`.
+23. Metro annonçant `127.0.0.1` au lieu de l'IP locale : forcer via `$env:REACT_NATIVE_PACKAGER_HOSTNAME` + `--lan`, et ouvrir le port 8081 dans le Pare-feu Windows — https://docs.expo.dev/more/expo-cli/#local-connection-troubleshooting
+
+
+## Stage 2 — Internationalisation & RTL
+
+24. Lire la doc i18next Quick Start avant tout code — https://react.i18next.com/guides/quick-start
+25. Lire la doc Expo Localization pour la détection de locale — https://docs.expo.dev/versions/latest/sdk/localization/
+26. Lire la doc React Native `I18nManager` pour comprendre `isRTL`/`allowRTL`/`forceRTL` — https://reactnative.dev/docs/i18nmanager
+27. Installer : `npx expo install expo-localization` puis `npm install i18next react-i18next` — https://react.i18next.com/guides/quick-start
+28. Créer les fichiers de traduction `i18n/locales/ar.json` et `i18n/locales/fr.json`.
+29. Centraliser `FALLBACK_LANGUAGE` et la détection RTL dans `i18n/types.ts` — une seule source de vérité, pas de valeur par défaut dupliquée.
+30. Créer `i18n/index.ts` avec l'init i18next + `expo-localization` pour la langue initiale.
+31. Installer `expo-updates` (nécessaire pour redémarrer l'app après un flip RTL) : `npx expo install expo-updates` — https://docs.expo.dev/versions/latest/sdk/updates/
+32. Créer `i18n/set-app-language.ts` : `allowRTL()` + `forceRTL()` + `Updates.reloadAsync()` (uniquement hors `__DEV__`, le flip RTL ne peut pas être simulé fiablement en Expo Go).
+33. **Piège à retenir** : `I18nManager.isRTL` est calculé par le natif au démarrage — pas une valeur qu'on assigne, elle ne se met à jour qu'après un vrai redémarrage natif de l'app.
+34. Ajouter la persistance du choix de langue via AsyncStorage dans `set-app-language.ts` — https://react-native-async-storage.github.io/async-storage/docs/usage/
+35. Rendre l'init i18next asynchrone (lecture AsyncStorage avant `i18n.init()`) pour éviter un flash de la mauvaise langue au démarrage.
+36. Gater le rendu de l'app derrière cette init avec `expo-splash-screen` (`preventAutoHideAsync` / `hideAsync`) — https://docs.expo.dev/versions/latest/sdk/splash-screen/
+
+## Notes Stage 2
+
+37. Vérification visuelle du flip RTL et du switch de langue **différée au Stage 10 (EAS Build)** — Expo Go ne peut pas simuler un redémarrage natif complet.
+
+
+## Stage 3 — Navigation
+
+38. Lire la doc Expo Router "Authentication" (approche actuelle, pas le pattern manuel du roadmap original) — https://docs.expo.dev/router/advanced/authentication/
+39. Lire la doc "Protected routes" pour comprendre le comportement de `Stack.Protected` — https://docs.expo.dev/router/advanced/protected/
+40. **Écart assumé vs roadmap** : utiliser `Stack.Protected` (guard déclaratif, SDK 53+) au lieu du pattern manuel `if (!session) return <Redirect />` — recommandation actuelle de la doc officielle.
+41. Créer un `SessionProvider` placeholder (state local) en attendant le vrai système d'auth du Stage 6.
+42. Déclarer les groupes de routes protégés avec des guards strictement complémentaires : `guard={!!session}` / `guard={!session}` — jamais de trou ni de chevauchement entre les deux conditions.
+43. Vérifier `typedRoutes: true` dans `app.json` (actif par défaut sur le template SDK 54) — https://docs.expo.dev/router/advanced/typed-routes/
+44. Valider les typed routes en testant qu'un `href` invalide devient une erreur TypeScript à la compilation.
+45. Vérifier le `scheme` dans `app.json` (généré automatiquement depuis le nom du projet) — https://docs.expo.dev/guides/deep-linking/
+46. Documenter chaque route deep-link supportée dans `docs/DECISIONS.md` au fur et à mesure, avant d'en avoir besoin pour les notifications push.
+
+## Notes Stage 3
+
+47. Test deep link réel (`npx uri-scheme open`) différé — nécessite un simulateur iOS ou émulateur Android non disponible dans l'environnement de dev actuel.
+
+
+
+## Stage 4 — State Management
+
+48. Décider AsyncStorage vs MMKV avant d'installer quoi que ce soit — MMKV nécessite un dev build natif, incompatible avec Expo Go. Rester sur AsyncStorage tant que ce n'est pas un vrai besoin de perf (revoir au Stage 8).
+49. Installer TanStack Query : `npm install @tanstack/react-query` — https://tanstack.com/query/latest/docs/framework/react/quick-start
+50. Installer Zustand : `npx expo install zustand` — https://github.com/pmndrs/zustand
+51. Créer `providers/query-provider.tsx` avec un `QueryClient` unique, config partagée (`staleTime`, `gcTime`, `retry`) — pas de config redéfinie par hook.
+52. Créer un store Zustand minimal pour valider le pattern avant toute vraie feature — réservé au state client uniquement, jamais aux données serveur (ça, c'est le rôle de Query).
+53. Pour un store qui doit persister : middleware `persist` + `createJSONStorage(() => AsyncStorage)` — https://zustand.docs.pmnd.rs/reference/middlewares/persist
+54. Utiliser `partialize` pour exclure du state persisté : les fonctions, et tout état transitoire/UI (`isLoading`, `modalOpen`, erreurs temporaires) qui n'a plus de sens après un redémarrage.
+55. Réserver SecureStore aux tokens d'authentification uniquement — sera câblé au Stage 6.
+
+## Notes Stage 4
+
+56. `partialize` filtre uniquement la *forme* de ce qui est écrit sur disque — un changement d'un champ non persisté déclenche quand même une écriture, `partialize` ne réduit pas la fréquence d'écriture, seulement son contenu.
+57. Sélecteurs partout, jamais de destructuring complet du store dans un composant — `useStore((s) => s.user)` et non `const { user } = useStore()`, sinon re-render sur chaque changement du store entier.
+58. Pour plusieurs champs à la fois : `useShallow` (Zustand v4.4+/v5), pas l'ancien `shallow` importé séparément — https://zustand.docs.pmnd.rs/hooks/use-shallow
+59. State dérivé (total, isLoggedIn, liste filtrée) jamais stocké tel quel — soit calculé inline via sélecteur dans le composant, soit via une fonction getter dans le store (`total: () => get().items.reduce(...)`), jamais synchronisé manuellement à côté du state source.
+60. Actions colocalisées dans le store, pas de reducers/dispatch séparés — la logique async (fetch, try/catch, isLoading/error) vit directement dans l'action, pas dans le composant appelant.
+61. Un seul store mega vs plusieurs petits stores : trancher tôt. Plusieurs stores (`useAuthStore`, `useCartStore`...) sauf si les slices doivent lire l'état les unes des autres — dans ce cas, pattern slices avec `StateCreator` combiné.
+62. Si pattern slices retenu : chaque slice typée séparément (`StateCreator<FullState, [], [], SliceState>`), combinées dans un seul `create<FullState>()((...a) => ({ ...sliceA(...a), ...sliceB(...a) }))` — jamais de store non typé.
+63. `devtools` middleware pour debug (Flipper/Redux DevTools) — coût nul en prod si bien conditionné, à ajouter seulement si le debugging state devient pénible.
+64. `immer` middleware réservé au state profondément imbriqué — mutation directe (`state.nested.deep.value = v`) au lieu de spread manuel sur plusieurs niveaux. Ne pas ajouter si le state reste plat, complexité inutile.
+
+
+## Hydration (bloque au Stage 6 — auth)
+
+65. `persist` lit le storage de façon async au démarrage — gap entre mount et state réellement chargé. Ne jamais tester `user`/`token` pour une redirection avant `useAuthStore.persist.hasHydrated()` à true, sinon flash de "non connecté" à chaque lancement.
+66. Écran de chargement/splash tant que `hasHydrated()` est false — `onFinishHydration()` pour s'abonner à l'événement, pas de polling.
+67. Prévoir `version` + `migrate` dans les options `persist` dès qu'un champ persisté change de forme — même en dev, éviter les crashs silencieux sur state persisté obsolète au prochain hot reload.
+
+
+## Stage 5 — Backend & Data Layer
+
+57. Installer le client Supabase : `npx expo install @supabase/supabase-js react-native-url-polyfill` — https://supabase.com/docs/reference/javascript/installing
+58. Suivre le tutoriel Expo/Supabase pour la config client React Native (polyfills, storage) — https://supabase.com/docs/guides/getting-started/tutorials/with-expo-react-native
+59. Créer `lib/supabase.ts`, typer le client avec `createClient<Database>(...)` — pas de client non typé.
+60. Générer les types depuis le schéma réel : `npx supabase gen types typescript --project-id <id> > supabase/database.ts` — https://supabase.com/docs/guides/api/rest/generating-types
+61. Utiliser les helpers générés `Tables<>` / `Enums<>` plutôt que de retaper les types à la main (`Database['public']['Tables'][...]`).
+62. Créer une couche `services/` — les écrans n'appellent jamais `supabase.from(...)` directement, seuls les fichiers de `services/` le font.
+63. Typer le retour des fonctions de service avec `QueryData<typeof maRequête>` pour les jointures — le type s'infère automatiquement de la requête, pas écrit à la main.
+64. Chaque service lève l'erreur (`throw`) plutôt que de l'avaler silencieusement — TanStack Query doit la recevoir pour gérer retry/état d'erreur correctement.
+65. Mapper les erreurs backend en messages utilisateur **dans chaque service**, contextuellement — jamais une table de correspondance générique globale (le même code d'erreur Postgres a un sens différent selon la table/l'opération).
+66. `QueryCache`/`MutationCache` du `QueryClient` (Stage 4) servent uniquement de filet de logging générique — pas de mapping de message là.
+
+## Notes Stage 5
+
+67. `lib/supabase.ts` utilise AsyncStorage pour la session (tutoriel officiel) — à migrer vers SecureStore au Stage 6 pour la sécurité du refresh token (voir décision Stage 0/1).
+68. Vérification des types en CI contre le schéma live — différée au Stage 9/10.
+</file>
+
+<file path="app/_layout.tsx">
+import '../global.css';
+
+import { useEffect, useState } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import 'react-native-reanimated';
+
+import {
+  Tajawal_400Regular,
+  Tajawal_500Medium,
+  Tajawal_700Bold,
+  Tajawal_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/tajawal';
+
+import {
+  ThemeProvider as NavigationThemeProvider,
+} from '@react-navigation/native';
+
+import { ThemeProvider, useTheme } from '@/providers/theme-provider';
+import { NAV_THEME } from '@/lib/theme';
+import { initI18n } from '@/i18n';
+
+import { SessionProvider, useSession } from '@/providers/session-provider';
+import { QueryProvider } from '@/providers/query-provider';
+
+import { PortalHost } from '@rn-primitives/portal';
+import { useOnboardingStore } from '@/stores/onboarding-store';
+
+SplashScreen.preventAutoHideAsync();
+
+
+function RootLayoutNav() {
+  const { isDark } = useTheme();
+  const { session } = useSession();
+  const onboardingCompleted  = useOnboardingStore((state) => state.isCompleted)
+
+
+  const colorScheme = isDark ? 'dark' : 'light';
+
+  return (
+    <NavigationThemeProvider value={NAV_THEME[colorScheme]}>
+      <Stack>
+        <Stack.Protected guard={!onboardingCompleted && !session}>
+          <Stack.Screen
+          options={{ headerShown: false }}
+          name="onboarding"
+        />
+        </Stack.Protected>
+
+        <Stack.Protected guard={onboardingCompleted && !session}>
+          <Stack.Screen
+            name="(auth)"
+            options={{
+              headerShown: true,
+              title: '',
+              headerTransparent: true,
+              headerTitle: '',
+              headerShadowVisible: false,
+            }}
+          />
+          <Stack.Screen
+            name="forget-password"
+            options={{
+              headerShown: true,
+              title: '',
+              headerTransparent: true,
+              headerTitle: '',
+              headerShadowVisible: false,
+            }}
+          />
+        </Stack.Protected>
+
+        <Stack.Protected guard={!!session}>
+          <Stack.Screen
+            name="(tabs)"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="update-password"
+            options={{
+              headerShown: true,
+              title: '',
+              headerTransparent: true,
+              headerTitle: '',
+              headerShadowVisible: false,
+            }}
+          />
+        </Stack.Protected>
+
+        <Stack.Screen
+          name="set-preferred-language"
+          options={{
+            headerShown: true,
+            title: '',
+            headerTransparent: true,
+            headerTitle: '',
+            headerShadowVisible: false,
+          }}
+        />
+      </Stack>
+
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+    </NavigationThemeProvider>
+  );
+}
+
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
+
+export default function RootLayout() {
+  const [isReady, setIsReady] = useState(false);
+  const [loaded, error] = useFonts({
+    Tajawal_400Regular,
+    Tajawal_500Medium,
+    Tajawal_700Bold,
+    Tajawal_800ExtraBold,
+  });
+
+
+  useEffect(() => {
+    const prepareApp = async () => {
+      try {
+        // Load everything in parallel
+        await Promise.all([
+          initI18n(),
+        ]);
+
+        setIsReady(true);
+        await SplashScreen.hideAsync();
+      } catch (error) {
+        console.log('Error preparing app:', error);
+        setIsReady(true);
+        await SplashScreen.hideAsync();
+      }
+    };
+
+    if (loaded || error) {
+      prepareApp();
+    }
+  }, [loaded, error]);
+
+  // Show nothing while preparing (splash screen is visible)
+  if (!isReady) {
+    return null;
+  }
+
+  if (!loaded && !error) {
+    return null;
+  }
+
+  return (
+    <ThemeProvider>
+      <QueryProvider>
+        <SessionProvider>
+          <RootLayoutNav />
+          <PortalHost />
+        </SessionProvider>
+      </QueryProvider>
+    </ThemeProvider>
+  );
+}
+</file>
+
 <file path="app/(tabs)/index.tsx">
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { setAppLanguage } from '@/i18n/set-app-language';
+import { useSession } from '@/providers/session-provider';
+import { router } from 'expo-router';
+import { useTheme } from '@/providers/theme-provider';
+import { useOnboardingStore } from '@/stores/onboarding-store';
+
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
+  const { toggleTheme } = useTheme();
+  const { signOut } = useSession();
+  const resetOnboarding = useOnboardingStore((state)=>state.resetOnboarding)
+
+  const reset = async ()=>{
+    await signOut();
+    resetOnboarding();
+  }
 
   return (
     <View className="flex-1 bg-background items-center justify-center gap-4">
       <Text className="text-foreground text-xl font-bold">{t('welcome')}</Text>
-      <Text className="text-muted-foreground">Current: {i18n.language}</Text>
 
       <View className="flex-row gap-2">
-        <Pressable onPress={() => setAppLanguage('fr')} className="bg-primary px-4 py-2 rounded-md">
-          <Text className="text-primary-foreground">Français</Text>
+        <Pressable onPress={signOut} className="bg-primary px-4 py-2 rounded-md">
+          <Text className="text-primary-foreground">Sign Out</Text>
         </Pressable>
-        <Pressable onPress={() => setAppLanguage('ar')} className="bg-primary px-4 py-2 rounded-md">
-          <Text className="text-primary-foreground">العربية</Text>
+
+        <Pressable onPress={toggleTheme} className="bg-primary px-4 py-2 rounded-md">
+          <Text className="text-primary-foreground">toggle theme</Text>
         </Pressable>
+
+        <Pressable onPress={reset} className="bg-primary px-4 py-2 rounded-md">
+          <Text className="text-primary-foreground">Reset onboarding</Text>
+        </Pressable>
+
+
       </View>
     </View>
   );
 }
+</file>
+
+<file path="package.json">
+{
+  "name": "win-nroh",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "expo start",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "lint": "expo lint"
+  },
+  "dependencies": {
+    "@expo-google-fonts/tajawal": "^0.4.1",
+    "@expo/vector-icons": "^15.0.3",
+    "@hookform/resolvers": "^5.9.0",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^7.4.0",
+    "@react-navigation/elements": "^2.6.3",
+    "@react-navigation/native": "^7.1.8",
+    "@rn-primitives/label": "^1.5.2",
+    "@rn-primitives/portal": "^1.5.3",
+    "@rn-primitives/slot": "^1.5.2",
+    "@supabase/supabase-js": "^2.109.0",
+    "@tanstack/react-query": "^5.101.4",
+    "aes-js": "^3.1.2",
+    "babel-preset-expo": "~54.0.10",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "expo": "~54.0.35",
+    "expo-asset": "~12.0.13",
+    "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
+    "expo-font": "~14.0.12",
+    "expo-haptics": "~15.0.8",
+    "expo-image": "~3.0.11",
+    "expo-linking": "~8.0.12",
+    "expo-localization": "~17.0.9",
+    "expo-router": "~6.0.24",
+    "expo-secure-store": "~15.0.8",
+    "expo-splash-screen": "~31.0.13",
+    "expo-status-bar": "~3.0.9",
+    "expo-symbols": "~1.0.8",
+    "expo-system-ui": "~6.0.9",
+    "expo-updates": "~29.0.19",
+    "expo-web-browser": "~15.0.11",
+    "i18next": "^26.3.6",
+    "nativewind": "4.2.1",
+    "prettier-plugin-tailwindcss": "^0.5.14",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-hook-form": "^7.85.0",
+    "react-i18next": "^17.0.11",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-get-random-values": "~1.11.0",
+    "react-native-keyboard-controller": "1.18.5",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-url-polyfill": "^4.0.0",
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.5.1",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/aes-js": "^3.1.4",
+    "@types/react": "~19.1.0",
+    "eslint": "^9.25.0",
+    "eslint-config-expo": "~10.0.0",
+    "patch-package": "^8.0.1",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
+</file>
+
+<file path="docs/DECISIONS.md">
+# Decisions
+
+| Concern | Choice | Why |
+|---|---|---|
+| Framework | Expo (managed, EAS Build) | OTA updates, cloud builds, no native config until we need a custom native module |
+| Styling | NativeWind v4 stable + Tailwind v3 | Stable, unchanging token contract |
+| UI primitives | react-native-reusables | Matches NativeWind, we own the component code |
+| Navigation | Expo Router | File-based, typed routes, deep linking |
+| Server state | TanStack Query | No hand-rolled loading/error/cache state |
+| Client state | Zustand | Minimal boilerplate, works with persistence middleware |
+| Persistence | AsyncStorage (hot-path state) / SecureStore (tokens/secrets) | AsyncStorage easier to test with Expo, no prebuild needed |
+| Forms | react-hook-form + zod | Type-safe validation, minimal re-renders |
+| Backend | Supabase | Generate TS types from schema |
+| i18n | i18next + react-i18next + expo-localization | See Stage 2 for RTL |
+
+
+## Notes
+- SDK 54 template (as of Aug 2026) ships without the old demo files (explore/hello-wave/parallax/etc.) — Stage 0.2 cleanup step skipped, nothing to remove.
+- Windows + metro-config: `metro-config/src/loadConfig.js` uses a raw `import(absolutePath)` on Windows absolute paths, which Node's ESM loader rejects (`ERR_UNSUPPORTED_ESM_URL_SCHEME`). Patched via patch-package to wrap with `pathToFileURL()`. See patches/metro-config+0.83.3.patch. Do not remove.
+- Dark mode: CSS `.dark {}` selector approach (shadcn web pattern) is unreliable on native NativeWind (GitHub issue #702). Using `vars()` + wrapping View instead — see theme/tokens.ts.
+
+## Stage 2 notes
+- RTL flip + language switch: visual verification requires an EAS standalone build (Expo Go can't simulate native restart). Deferred to Stage 10.
+- Language persisted via AsyncStorage (`@app_language`), app render gated behind async i18n init + expo-splash-screen to avoid FOUC-style language flash.
+
+## Stage 3 notes
+- Used `Stack.Protected` (Expo Router SDK 53+) instead of the roadmap's manual `if (!session) return <Redirect />` pattern — current official doc recommendation, declarative guard with automatic history cleanup. See https://docs.expo.dev/router/advanced/authentication/
+- `SessionProvider` is a placeholder (local state only) until real auth is wired in Stage 6.
+- Deep link testing (`npx uri-scheme open winnroh://...`) requires an iOS simulator or Android emulator — deferred, not available in current dev environment.
+
+
+## Stage 4 notes
+- Using AsyncStorage instead of MMKV for now — MMKV requires a native dev build (incompatible with Expo Go), not worth the setup cost yet. Revisit at Stage 8 (Performance) if needed.
+- Zustand persist middleware uses `createJSONStorage(() => AsyncStorage)` for any store needing persistence (see stores/example-persisted-store.ts as reference pattern).
+- SecureStore reserved for auth tokens only — will be wired in Stage 6.
+
+
+## Stage 5 notes
+- lib/supabase.ts uses AsyncStorage for session storage (per official Supabase/Expo tutorial) — TODO Stage 6: swap to SecureStore adapter for refresh token security (see Stage 0/1 decision on AsyncStorage vs SecureStore).
+
+## Stage 6 notes
+- Session storage: LargeSecureStore (AES-256 key in SecureStore, encrypted blob in AsyncStorage) — needed because SecureStore's 2048 byte limit is exceeded by OAuth session data. See official Supabase Expo Social Auth guide.
 </file>
 
 </files>

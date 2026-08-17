@@ -37,3 +37,6 @@
 
 ## Stage 5 notes
 - lib/supabase.ts uses AsyncStorage for session storage (per official Supabase/Expo tutorial) — TODO Stage 6: swap to SecureStore adapter for refresh token security (see Stage 0/1 decision on AsyncStorage vs SecureStore).
+
+## Stage 6 notes
+- Session storage: LargeSecureStore (AES-256 key in SecureStore, encrypted blob in AsyncStorage) — needed because SecureStore's 2048 byte limit is exceeded by OAuth session data. See official Supabase Expo Social Auth guide.

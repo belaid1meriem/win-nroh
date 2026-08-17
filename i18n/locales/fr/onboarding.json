@@ -1,0 +1,27 @@
+{
+  "slides": {
+    "discover": {
+      "title_ar": "اكتشف",
+      "description_ar": "أماكن جديدة حولك",
+      "title_fr": "Découvrez",
+      "description_fr": "de nouveaux endroits autour de toi"
+    },
+    "save": {
+      "title_ar": "احفظ",
+      "description_ar": "أماكنك المفضلة في مكان واحد",
+      "title_fr": "Enregistre",
+      "description_fr": "tes endroits préférés au même endroit"
+    },
+    "plan": {
+      "title_ar": "خطط",
+      "description_ar": "لنزهاتك القادمة بسهولة",
+      "title_fr": "Planifie",
+      "description_fr": "tes prochaines sorties en toute simplicité"
+    }
+  },
+  "actions": {
+    "skip": "Passer",
+    "next": "Suivant",
+    "start": "Commencer"
+  }
+}

@@ -101,3 +101,22 @@
 65. `persist` lit le storage de façon async au démarrage — gap entre mount et state réellement chargé. Ne jamais tester `user`/`token` pour une redirection avant `useAuthStore.persist.hasHydrated()` à true, sinon flash de "non connecté" à chaque lancement.
 66. Écran de chargement/splash tant que `hasHydrated()` est false — `onFinishHydration()` pour s'abonner à l'événement, pas de polling.
 67. Prévoir `version` + `migrate` dans les options `persist` dès qu'un champ persisté change de forme — même en dev, éviter les crashs silencieux sur state persisté obsolète au prochain hot reload.
+
+
+## Stage 5 — Backend & Data Layer
+
+57. Installer le client Supabase : `npx expo install @supabase/supabase-js react-native-url-polyfill` — https://supabase.com/docs/reference/javascript/installing
+58. Suivre le tutoriel Expo/Supabase pour la config client React Native (polyfills, storage) — https://supabase.com/docs/guides/getting-started/tutorials/with-expo-react-native
+59. Créer `lib/supabase.ts`, typer le client avec `createClient<Database>(...)` — pas de client non typé.
+60. Générer les types depuis le schéma réel : `npx supabase gen types typescript --project-id <id> > supabase/database.ts` — https://supabase.com/docs/guides/api/rest/generating-types
+61. Utiliser les helpers générés `Tables<>` / `Enums<>` plutôt que de retaper les types à la main (`Database['public']['Tables'][...]`).
+62. Créer une couche `services/` — les écrans n'appellent jamais `supabase.from(...)` directement, seuls les fichiers de `services/` le font.
+63. Typer le retour des fonctions de service avec `QueryData<typeof maRequête>` pour les jointures — le type s'infère automatiquement de la requête, pas écrit à la main.
+64. Chaque service lève l'erreur (`throw`) plutôt que de l'avaler silencieusement — TanStack Query doit la recevoir pour gérer retry/état d'erreur correctement.
+65. Mapper les erreurs backend en messages utilisateur **dans chaque service**, contextuellement — jamais une table de correspondance générique globale (le même code d'erreur Postgres a un sens différent selon la table/l'opération).
+66. `QueryCache`/`MutationCache` du `QueryClient` (Stage 4) servent uniquement de filet de logging générique — pas de mapping de message là.
+
+## Notes Stage 5
+
+67. `lib/supabase.ts` utilise AsyncStorage pour la session (tutoriel officiel) — à migrer vers SecureStore au Stage 6 pour la sécurité du refresh token (voir décision Stage 0/1).
+68. Vérification des types en CI contre le schéma live — différée au Stage 9/10.

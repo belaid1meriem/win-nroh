@@ -1,3 +1,110 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Base */
+    --background: 40 50% 97.6%;
+    --foreground: 190 34.3% 13.7%;
+
+    /* Surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 190 34.3% 13.7%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 190 34.3% 13.7%;
+
+    /* Brand */
+    --primary: 185.9 89.2% 29%;
+    --primary-foreground: 0 0% 100%;
+
+    --primary-dark: 185.9 91.1% 22%;
+    --primary-light: 177.3 47.8% 91%;
+
+    /* Secondary */
+    --secondary: 189 8.9% 43.9%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Muted */
+    --muted: 160 12% 95.1%;
+    --muted-foreground: 189 8.9% 43.9%;
+
+    /* Accent */
+    --accent: 26.5 87% 66.9%;
+    --accent-light: 27.9 100% 94.5%;
+    --accent-foreground: 190 34.3% 13.7%;
+
+    /* Status */
+    --success: 103.8 28.8% 42.9%;
+    --success-foreground: 0 0% 100%;
+
+    --destructive: 1.9 62.7% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders / Inputs */
+    --border: 168 10.2% 90.4%;
+    --input: 168 10.2% 90.4%;
+    --ring: 185.9 89.2% 29%;
+
+    /* Radius */
+    --radius: 0.75rem;
+
+    /* Charts */
+    --chart-1: 185.9 89.2% 29%;
+    --chart-2: 26.5 87% 66.9%;
+    --chart-3: 103.8 28.8% 42.9%;
+    --chart-4: 177.3 47.8% 91%;
+    --chart-5: 1.9 62.7% 60%;
+  }
+
+  .dark:root {
+    /* Base */
+    --background: 190 27.3% 8.6%;
+    --foreground: 160 14.3% 95.9%;
+
+    /* Surfaces */
+    --card: 188 24.6% 12%;
+    --card-foreground: 160 14.3% 95.9%;
+    --popover: 188 24.6% 12%;
+    --popover-foreground: 160 14.3% 95.9%;
+
+    /* Brand */
+    --primary: 183.2 60.2% 42.4%;
+    --primary-foreground: 0 0% 100%;
+
+    --primary-dark: 183.5 65.8% 31%;
+    --primary-light: 185.2 56.1% 16.1%;
+
+    /* Secondary */
+    --secondary: 183.5 9.6% 65.3%;
+    --secondary-foreground: 190 27.3% 8.6%;
+
+    /* Muted */
+    --muted: 189.5 22.9% 16.3%;
+    --muted-foreground: 183.5 9.6% 65.3%;
+
+    /* Accent */
+    --accent: 26.5 87% 66.9%;
+    --accent-light: 23.1 28.9% 17.6%;
+    --accent-foreground: 190 27.3% 8.6%;
+
+    /* Status */
+    --success: 103.6 27.5% 52.9%;
+    --success-foreground: 0 0% 100%;
+
+    --destructive: 2 72.1% 67.6%;
+    --destructive-foreground: 190 27.3% 8.6%;
+
+    /* Borders / Inputs */
+    --border: 186.7 17.3% 20.4%;
+    --input: 186.7 17.3% 20.4%;
+    --ring: 183.2 60.2% 42.4%;
+
+    /* Charts */
+    --chart-1: 183.2 60.2% 42.4%;
+    --chart-2: 26.5 87% 66.9%;
+    --chart-3: 103.6 27.5% 52.9%;
+    --chart-4: 177.3 47.8% 91%;
+    --chart-5: 2 72.1% 67.6%;
+  }
+}
